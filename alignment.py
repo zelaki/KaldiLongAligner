@@ -5,24 +5,24 @@ from utils import IslandSegment, ctmEntry, labEntry
 
 class T2TAlignment():
 
-    def __init__(
-        self,
-        reference: List[str],
-        hypothesis: List[str],
-        hypothesis_ctm: List[ctmEntry], 
-        current_alignment: Optional[List[labEntry]],
-        text_onset_index: int,
-        segment_onset_time: float,
-        init: bool
-    ):
+    # def __init__(
+    #     self
+    #     reference: List[str],
+    #     # hypothesis: List[str],
+    #     # hypothesis_ctm: List[ctmEntry], 
+    #     # current_alignment: Optional[List[labEntry]],
+    #     # text_onset_index: int,
+    #     # segment_onset_time: float,
+    #     # init: bool
+    # ):
 
-        self.reference = reference
-        self.hypothesis = hypothesis
-        self.hypothesis_ctm = hypothesis_ctm
-        self.current_alignment = current_alignment
-        self.text_onset_index = text_onset_index
-        self.segment_onset_time = segment_onset_time
-        self.init = init
+        # self.reference = reference
+        # self.hypothesis = hypothesis
+        # self.hypothesis_ctm = hypothesis_ctm
+        # self.current_alignment = current_alignment
+        # self.text_onset_index = text_onset_index
+        # self.segment_onset_time = segment_onset_time
+        # self.init = init
     
     def text_to_text_align(self, reference, hypothesis, EPS: str = "*") -> str:
         """
@@ -97,9 +97,9 @@ class T2TAlignment():
             islands.append(island_segment)
         return islands
 
-    def initialize_alignment(self) -> List[labEntry]:
+    def initialize_alignment(self, reference) -> List[labEntry]:
 
-        return [labEntry(word=word, onset=-1, offset=-1) for word in self.reference]
+        return [labEntry(word=word, onset=-1, offset=-1) for word in reference]
 
 
     def frames_to_seconds(self, frames: int, frame_shift: float = 0.01) -> float:
@@ -109,12 +109,12 @@ class T2TAlignment():
 
     def update_alignment(
         self,
-        # current_alignment: List[labEntry],
-        # hypothesis_ctm: List[ctmEntry],
+        current_alignment: List[labEntry],
+        hypothesis_ctm: List[ctmEntry],
         reference_islands: List[IslandSegment],
-        hypothesis_islands: List[IslandSegment]
-        # text_onset_index: int,
-        # segment_onset_time: float
+        hypothesis_islands: List[IslandSegment],
+        text_onset_index: int,
+        segment_onset_time: float
         # log_path
         ):
 
@@ -137,27 +137,40 @@ class T2TAlignment():
             ref_island_offset = ref_island.offset_index
             hyp_island_onset = hyp_island.onset_index
             while ref_island_onset <= ref_island_offset:
-                ctm_entry = self.hypothesis_ctm[hyp_island_onset]
-                lab_entry = self.current_alignment[self.text_onset_index+ref_island_onset]
+                ctm_entry = hypothesis_ctm[hyp_island_onset]
+                lab_entry = current_alignment[text_onset_index+ref_island_onset]
                 try:
                     assert lab_entry.word == ctm_entry.word
                 except:
                     print('Words in correct segments are not matching')
                 
-                lab_entry.onset = self.segment_onset_time + self.frames_to_seconds(ctm_entry.onset)
+                lab_entry.onset = segment_onset_time + self.frames_to_seconds(ctm_entry.onset)
                 lab_entry.offset = lab_entry.onset + self.frames_to_seconds(ctm_entry.duration)
 
                 ref_island_onset+=1
                 hyp_island_onset+=1
-        return self.current_alignment
+        return current_alignment
 
-    def run(self):
-        reference_t2t = self.text_to_text_align(self.reference, self.hypothesis)
-        hypothesis_t2t = self.text_to_text_align(self.hypothesis, self.reference)
+    def run(self,
+            reference: List[str],
+            hypothesis: List[str],
+            hypothesis_ctm: List[ctmEntry], 
+            current_alignment: Optional[List[labEntry]],
+            text_onset_index: int,
+            segment_onset_time: float,
+            ):
+        reference_t2t = self.text_to_text_align(reference, hypothesis)
+        hypothesis_t2t = self.text_to_text_align(hypothesis, reference)
         reference_islands = self.text_to_text_islands(reference_t2t)
         hypothesis_islands = self.text_to_text_islands(hypothesis_t2t)
-        self.current_alignment = self.initialize_alignment()
+        if current_alignment == None:
+            current_alignment = self.initialize_alignment(reference=reference)
+
         current_alignment = self.update_alignment(
+            current_alignment=current_alignment,
+            hypothesis_ctm=hypothesis_ctm,
             reference_islands=reference_islands,
-            hypothesis_islands=hypothesis_islands)
+            hypothesis_islands=hypothesis_islands,
+            text_onset_index=text_onset_index,
+            segment_onset_time=segment_onset_time)
         return current_alignment

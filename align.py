@@ -32,14 +32,17 @@ hypothesis_ctm = transcriber.decode_ctm('working_dir/feats.ark')[0][1]
 hypothesis = transcriber.decode_text('working_dir/feats.ark')[0][1]
 hypothesis = hypothesis.split()
 reference = read_reference_text(reference_path)
-t2talignment = T2TAlignment(
+
+
+
+t2talignment = T2TAlignment()
+
+alignment_lab = t2talignment.run(
         reference=reference,
         hypothesis=hypothesis,
         hypothesis_ctm=hypothesis_ctm,
         current_alignment = None,
         text_onset_index=0,
-        segment_onset_time=.0,
-        init=True)
-
-alignment_lab = t2talignment.run()
+        segment_onset_time=.0
+)
 print(alignment_lab)
