@@ -45,4 +45,5 @@ alignment_lab = t2talignment.run(
         text_onset_index=0,
         segment_onset_time=.0
 )
+
 print(alignment_lab)
