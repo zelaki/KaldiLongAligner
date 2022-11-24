@@ -1,7 +1,11 @@
 import shutil
 import os
+import yaml
+import argparse
 from dataclasses import dataclass
 from typing import List, Dict, Any
+from yaml.loader import SafeLoader
+
 
 MetaDict = Dict[str, Any]
 
@@ -22,6 +26,12 @@ class IslandSegment:
     onset_index: int
     offset_index: int
 
+@dataclass
+class UnaliRegion:
+    onset_index: int
+    offset_index: int
+    onset_time: float
+    offset_time: float
 
 
 def thirdparty_binary(binary_name: str) -> str:
@@ -131,7 +141,45 @@ def create_hclg_args(model_dir_path: str, working_dir_path: str) -> HCLGArgs:
     )
     return args
 
+def read_yaml_file(yaml_path):
+    with open(yaml_path, 'r') as f:
+        data = list(yaml.load_all(f, Loader=SafeLoader))
+        return data[0]
 
+
+
+def initialize_working_dir(
+    audio_path: str, 
+    transcription_path: str,
+    working_dir_path: str
+    ) -> None:
+
+    os.makedirs(working_dir_path, exist_ok=True)
+    graph_directory = os.path.join(working_dir_path, 'graph')
+    lm_directory = os.path.join(working_dir_path, 'lm_dir')
+    os.makedirs(graph_directory, exist_ok=True)
+    os.makedirs(lm_directory, exist_ok=True)
+
+    # create wav.scp
+    wav_scp = os.path.join(working_dir_path, 'wav.scp')
+    with open(wav_scp, 'w') as f:
+        f.write(f'key_1 {audio_path}')
+    
+    # create segments
+    segments = os.path.join(working_dir_path, 'segments')
+    with open(segments, 'w') as f:
+        f.write('key_1 key_1 0 -1')
+    
+    
+def arg_parser():
+
+    parser = argparse.ArgumentParser(description="Speech to text alignmener for long audio")
+    parser.add_argument('-a', type=str, help="Path to audio file")
+    parser.add_argument("-t", type=str, help="Path to transcription")
+    parser.add_argument("-m", type=str, help="Path to model directory")
+    parser.add_argument('-w', type=str, help="Path to working directory")
+
+    return parser
 
 
 class FeatureConfigMixin:

@@ -1,6 +1,7 @@
 import typing
 import os
 import subprocess
+from typing import List
 from graph import compose_clg, compose_hclg, compose_lg, generate_text_transducer, get_tree_info
 from kaldi.asr import GmmLatticeFasterRecognizer
 from kaldi.decoder import LatticeFasterDecoderOptions
@@ -8,6 +9,8 @@ from kaldi.util.table import SequentialMatrixReader
 from kaldi.lat.align import WordBoundaryInfoNewOpts, WordBoundaryInfo
 from kaldi.alignment import GmmAligner
 from utils import thirdparty_binary, ctmEntry, HCLGArgs, TranscriberArgs
+from features import Mfcc
+
 
 final_model = '/home/theokouz/kaldi/egs/betterReading/s5/exp/tri3b_bs/final.mdl'
 tree = '/home/theokouz/kaldi/egs/betterReading/s5/exp/tri3b_bs/tree'
@@ -309,3 +312,66 @@ class Transcriber():
 
 
 
+class DecodeSegments():
+
+    def __init__(
+        self,
+        feature_extractor: Mfcc,
+        hclg: CreateHCLG,
+        transcriber: Transcriber,
+        reference: List[str],
+        segments_dir_path: str,
+        init: bool
+    ) -> None:
+
+        self.feature_extractor = feature_extractor
+        self.hclg = hclg
+        self.transcriber = transcriber 
+        self.reference = reference
+        self.segments_dir_path, segments_dir_path
+        if init:
+            self.create_dirs = True
+
+    def create_segments_file(
+        self,
+        unaligned_region,
+        segment_data_dir_path
+    ) -> None:
+
+        segments = os.path.join(segment_data_dir_path, 'segments')
+        with open(segments, 'w') as f:
+            f.write('segment_{onset}_{offset} key_1 {onset} {offset}'.format(
+                onset=unaligned_region.onset_time,
+                offset=unaligned_region.offset_time
+                )
+            )
+        return segments
+
+    def create_segment_text(
+        self,
+        unaligned_region,
+        segment_data_dir_path) -> str:
+        
+        text_path = os.path.join(segment_data_dir_path, 'text')
+        text = self.reference[unaligned_region.onset_index : unaligned_region.offset_index+1]
+        with open(text, 'w') as f:
+            f.write(' '.join(text))
+        return text_path
+
+
+    def decode_segment(
+        self,
+        segment,
+        feats_ark,
+        text
+
+    ) -> None:
+        self.feature_extractor.make_feats(segment_path=segment)
+        self.hclg.mkgraph(text, 'trigram')
+        hypothesis_ctm = self.transcriber.decode_ctm(feats_ark)[0][1]
+        hypothesis = self.transcriber.decode_text(feats_ark)[0][1]
+
+        return hypothesis, hypothesis_ctm
+
+
+        
