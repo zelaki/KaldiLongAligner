@@ -81,8 +81,8 @@ def get_tree_info(tree_path, log_file, info):
         env=os.environ
 
     )
-
-    return grep_proc.stdout.read().decode("utf-8").rstrip().split()[1]
+    info = grep_proc.stdout.read().decode("utf-8").rstrip().split()[1]
+    return info
 
 def compose_clg(
     in_disambig: str,
@@ -282,10 +282,10 @@ def generate_text_transducer(lm_text: str, words_path: str, g_text_path:str, ski
 
             idx+=1
 
-if __name__ == '__main__':
-    words_path = '/home/theokouz/kaldi/egs/betterReading/s5/data/lang_kids_new/words.txt'
+# if __name__ == '__main__':
+#     words_path = '/home/theokouz/kaldi/egs/betterReading/s5/data/lang_kids_new/words.txt'
 
-    generate_text_transducer('lm_text', words_path,'G.txt')
+#     generate_text_transducer('lm_text', words_path,'G.txt')
 
 
 

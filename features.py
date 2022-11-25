@@ -98,7 +98,9 @@ class Mfcc():
     def make_feats(self, segment_path) -> None:
         """Run the function"""
         with open(self.log_path, "w") as log_file:
-            use_pitch = self.pitch_options.pop("use-pitch")
+            print(self.pitch_options)
+            # use_pitch = self.pitch_options.pop("use-pitch")
+            use_pitch = False
             mfcc_base_command = [thirdparty_binary("compute-mfcc-feats"), "--verbose=2"]
             raw_ark_path = self.feats_scp_path.replace(".scp", ".ark")
             if os.path.exists(raw_ark_path):

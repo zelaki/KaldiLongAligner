@@ -85,6 +85,7 @@ class HCLGArgs():
     working_directory: str
     final_model_path: str 
     words_path: str
+    model_dir_path: str
 
 @dataclass
 class TranscriberArgs():
@@ -123,7 +124,7 @@ def create_transcriber_args(model_dir_path: str, working_dir_path: str) -> Trans
     args = TranscriberArgs(
         final_model_path = os.path.join(model_dir_path, 'final.mdl'),
         tree_path = os.path.join(model_dir_path, 'tree'),
-        hclg_path = os.path.join(model_dir_path, 'graph', 'HCLG.fst'),
+        hclg_path = os.path.join(working_dir_path, 'graph_dir', 'HCLG.fst'),
         words_path = os.path.join(model_dir_path, 'words.txt'),
         disambig_int_path = os.path.join(model_dir_path, 'disambig.int'),
         lexicon_fst_path = os.path.join(model_dir_path, "L.fst"),
@@ -138,6 +139,7 @@ def create_hclg_args(model_dir_path: str, working_dir_path: str) -> HCLGArgs:
         working_directory=working_dir_path,
         final_model_path=os.path.join(model_dir_path,'final.mdl'),
         words_path=os.path.join(model_dir_path, 'words.txt'),
+        model_dir_path = model_dir_path
     )
     return args
 
@@ -149,17 +151,19 @@ def read_yaml_file(yaml_path):
 
 
 def initialize_working_dir(
-    audio_path: str, 
-    transcription_path: str,
-    working_dir_path: str
+    audio_path: str,
+    transcription_path: str, 
+    working_dir_path: str,
+    segments_data_dirs: str,
+    lm_text_path: str
     ) -> None:
 
     os.makedirs(working_dir_path, exist_ok=True)
-    graph_directory = os.path.join(working_dir_path, 'graph')
+    graph_directory = os.path.join(working_dir_path, 'graph_dir')
     lm_directory = os.path.join(working_dir_path, 'lm_dir')
     os.makedirs(graph_directory, exist_ok=True)
     os.makedirs(lm_directory, exist_ok=True)
-
+    os.makedirs(segments_data_dirs, exist_ok=True)
     # create wav.scp
     wav_scp = os.path.join(working_dir_path, 'wav.scp')
     with open(wav_scp, 'w') as f:
@@ -169,6 +173,13 @@ def initialize_working_dir(
     segments = os.path.join(working_dir_path, 'segments')
     with open(segments, 'w') as f:
         f.write('key_1 key_1 0 -1')
+    
+    # create lm text
+    with open(lm_text_path, 'w') as lm:
+        with open(transcription_path, 'r') as transc:
+            reference_text = transc.readline().rstrip()
+        lm.write(f'<s> {reference_text} </s>')
+
     
     
 def arg_parser():

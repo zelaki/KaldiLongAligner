@@ -1,29 +1,18 @@
 import typing
 import os
+import shutil
 import subprocess
-from typing import List
+from typing import List, Tuple
 from graph import compose_clg, compose_hclg, compose_lg, generate_text_transducer, get_tree_info
 from kaldi.asr import GmmLatticeFasterRecognizer
 from kaldi.decoder import LatticeFasterDecoderOptions
 from kaldi.util.table import SequentialMatrixReader
 from kaldi.lat.align import WordBoundaryInfoNewOpts, WordBoundaryInfo
 from kaldi.alignment import GmmAligner
-from utils import thirdparty_binary, ctmEntry, HCLGArgs, TranscriberArgs
+from utils import thirdparty_binary, create_hclg_args, \
+    ctmEntry, HCLGArgs, TranscriberArgs, UnaliRegion, create_mfcc_args, \
+    create_transcriber_args
 from features import Mfcc
-
-
-final_model = '/home/theokouz/kaldi/egs/betterReading/s5/exp/tri3b_bs/final.mdl'
-tree = '/home/theokouz/kaldi/egs/betterReading/s5/exp/tri3b_bs/tree'
-L = '/home/theokouz/kaldi/egs/betterReading/s5/data/lang_kids_new/L.fst'
-words = '/home/theokouz/kaldi/egs/betterReading/s5/data/lang_kids_new/words.txt'
-disambig = '/home/theokouz/kaldi/egs/betterReading/s5/data/lang_kids_new/phones/disambig.int'
-phones = '/home/theokouz/kaldi/egs/betterReading/s5/data/lang_kids/phones.txt'
-word_bound = '/home/theokouz/kaldi/egs/betterReading/s5/data/lang_kids_new/phones/word_boundary.int'
-hclg = '/home/theokouz/kaldi/egs/betterReading/s5/exp/tri3b_bs/graph/HCLG.fst'
-
-
-
-
 
 
 
@@ -55,6 +44,8 @@ class CreateHCLG():
     # working_directory: str,
     # final_model_path: str,
 ):
+        self.model_dir_path = args.model_dir_path
+        self.tree_path = os.path.join(self.model_dir_path, 'tree')
         self.disambig_L_path = args.disambig_L_path
         self.disambig_int_path = args.disambig_int_path
         self.working_directory = args.working_directory
@@ -109,22 +100,20 @@ class CreateHCLG():
             
 
     def make_trigram(self, lmtext_path: str):
-
         with open(self.log_file_path, 'a') as log_file:
-            build_proc = subprocess.Popen(
+            subprocess.run(
                 [thirdparty_binary('build-lm.sh'), "-i", lmtext_path, "-o", self.lm_gz_path],
                 stderr=log_file,
                 stdout=subprocess.PIPE,
                 env=os.environ,
             )
-
             compile_proc = subprocess.Popen(
                 [thirdparty_binary('compile-lm'), self.lm_gz_path, "-t=yes", "/dev/stdout"],
-                stdin=build_proc.stdout,
                 stdout=subprocess.PIPE,
                 stderr=log_file,
                 env=os.environ,
             )
+
             to_fst_proc = subprocess.Popen(
                 [thirdparty_binary("arpa2fst"), "--disambig-symbol=#0",
                 f"--read-symbol-table={self.words_path}", "-", self.g_path],
@@ -145,8 +134,8 @@ class CreateHCLG():
             log_file.write("Generating LG.fst...")
             compose_lg(self.disambig_L_path, self.g_path, self.lg_path, log_file)
 
-            context_width = get_tree_info('tree', log_file, 'context-width')
-            central_pos = get_tree_info('tree', log_file, 'central-position')
+            context_width = get_tree_info(self.tree_path, log_file, 'context-width')
+            central_pos = get_tree_info(self.tree_path, log_file, 'central-position')
             ilabels_temp = f"ilabels_{context_width}_{central_pos}"
             out_disambig = f"disambig_ilabels_{context_width}_{central_pos}"
 
@@ -163,7 +152,7 @@ class CreateHCLG():
             )
 
             compose_hclg(
-                self.working_directory,
+                self.model_dir_path,
                 ilabels_temp,
                 self.transition_scale,
                 self.clg_path,
@@ -267,8 +256,12 @@ class Transcriber():
         self.decoder_opts = LatticeFasterDecoderOptions()
         self.decoder_opts.beam = 11.0
         self.decoder_opts.max_active = 7000
+
         self.asr = GmmLatticeFasterRecognizer.from_files(
-            final_model, hclg, words, decoder_opts=self.decoder_opts)
+            self.final_model_path,
+            self.hclg_path,
+            self.words_path,
+            decoder_opts=self.decoder_opts)
 
     def decode(self, feats_ark):
         # Decode
@@ -316,6 +309,8 @@ class DecodeSegments():
 
     def __init__(
         self,
+        model_dir: str,
+        wav_scp: str,
         feature_extractor: Mfcc,
         hclg: CreateHCLG,
         transcriber: Transcriber,
@@ -323,19 +318,20 @@ class DecodeSegments():
         segments_dir_path: str,
         init: bool
     ) -> None:
-
+        self.model_dir = model_dir
+        self.wav_scp = wav_scp
         self.feature_extractor = feature_extractor
         self.hclg = hclg
         self.transcriber = transcriber 
         self.reference = reference
-        self.segments_dir_path, segments_dir_path
+        self.segments_dir_path = segments_dir_path
         if init:
             self.create_dirs = True
 
     def create_segments_file(
         self,
-        unaligned_region,
-        segment_data_dir_path
+        unaligned_region: List[UnaliRegion],
+        segment_data_dir_path: str
     ) -> None:
 
         segments = os.path.join(segment_data_dir_path, 'segments')
@@ -349,15 +345,28 @@ class DecodeSegments():
 
     def create_segment_text(
         self,
-        unaligned_region,
-        segment_data_dir_path) -> str:
+        unaligned_region: List[UnaliRegion],
+        segment_data_dir_path: str) -> Tuple[str, str]:
         
         text_path = os.path.join(segment_data_dir_path, 'text')
         text = self.reference[unaligned_region.onset_index : unaligned_region.offset_index+1]
-        with open(text, 'w') as f:
-            f.write(' '.join(text))
-        return text_path
+        text = ' '.join(text)
+        with open(text_path, 'w') as f:
+            f.write(text)
+        return text_path, text
 
+    def create_segnemt_lm_text(
+        self,
+        segment_data_dir_path: str,
+        text: str
+    ) -> str:
+
+        lm_text_path = os.path.join(
+            segment_data_dir_path,
+            'lm.txt')
+        with open(lm_text_path, 'w') as f:
+            f.write(f'<s> {text} </s>')
+        return lm_text_path
 
     def decode_segment(
         self,
@@ -372,6 +381,73 @@ class DecodeSegments():
         hypothesis = self.transcriber.decode_text(feats_ark)[0][1]
 
         return hypothesis, hypothesis_ctm
+
+    
+    def decode_parallel(
+        self,
+        unaligned_regions
+    ) -> None:
+        
+        for unaligned_region in unaligned_regions:
+            segment_data_dir_path = os.path.join(
+                self.segments_dir_path,
+                f'{unaligned_region.onset_time}_{unaligned_region.offset_time}'
+            )
+            os.makedirs(segment_data_dir_path, exist_ok=True)
+            segment_feat_ark = os.path.join(
+                segment_data_dir_path,
+                'feats.ark'
+            )
+
+            segments_path = self.create_segments_file(
+                segment_data_dir_path=segment_data_dir_path,
+                unaligned_region=unaligned_region)
+            text_path, text = self.create_segment_text(
+                segment_data_dir_path=segment_data_dir_path,
+                unaligned_region=unaligned_region
+            )
+            lm_text_path = self.create_segnemt_lm_text(
+                segment_data_dir_path=segment_data_dir_path,
+                text=text
+            )
+
+
+            hclg_args = create_hclg_args(
+                self.model_dir,
+                segment_data_dir_path)
+            hclg = CreateHCLG(hclg_args)
+            hclg.mkgraph(lm_text_path, 'trigram')
+
+
+            self.feature_extractor.make_feats(
+                segment_path=segments_path)
+            
+            shutil.copyfile(
+                self.wav_scp,
+                os.path.join(segment_data_dir_path, 'wav.scp')
+                )
+            mfcc_args = create_mfcc_args(
+                self.model_dir,
+                segment_data_dir_path)
+            mfcc = Mfcc(mfcc_args)
+            mfcc.make_feats(segment_path=segments_path)
+
+            transcriber_args = create_transcriber_args(
+                self.model_dir,
+                segment_data_dir_path
+                )
+            transcriber = Transcriber(transcriber_args)
+
+
+            hypothesis = transcriber.decode_text(segment_feat_ark)[0][1]
+
+
+
+            
+        return hypothesis
+
+
+
 
 
         

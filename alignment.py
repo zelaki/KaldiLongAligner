@@ -154,55 +154,41 @@ class T2TAlignment():
 
     def get_unaligned_regions(
         self,
-        reference_islands: List[IslandSegment],
-        current_alignment: List[labEntry]
+        current_alignemnt: List[labEntry]
     ):
 
-        unified_islands = []
-        reference_islands_iter = iter(reference_islands[:-1])
-
-        for idx, island in enumerate(reference_islands_iter):
-            if island.offset_index == reference_islands[idx+1].onset_index - 1:
-                unified_islands.append(
-                    IslandSegment(
-                        onset_index=island.onset_index,
-                        offset_index=reference_islands[idx+1].offset_index
-                    )
-                )
-                reference_islands_iter.__next__()
-                idx+=idx
-            else: 
-                unified_islands.append(island)
-        unified_islands.append(reference_islands[-1])
-
         unaligned_regions = []
-        for island, nxt_island in zip(unified_islands, unified_islands[1:]):
-            if island.onset_index != 0:
+        if current_alignemnt[0].onset == -1:
+            unali_reg_onset = 0
+            unali_reg_flag = True
+        else:
+            unali_reg_flag = False
+        
+        for idx, entry in enumerate(current_alignemnt[1:]):
+            if entry.onset == -1 and not unali_reg_flag:
+                unali_reg_onset = idx
+                unali_reg_flag = True
+            elif entry.onset != -1 and unali_reg_flag:
                 unaligned_regions.append(
                     UnaliRegion(
-                        onset_index=0,
-                        offset_index=island.onset_index-1,
-                        onset_time=.0,
-                        offset_time=current_alignment[island.onset_index].onset
+                        onset_index=unali_reg_onset,
+                        offset_index=idx-1,
+                        onset_time=.0 if unali_reg_onset==0
+                            else current_alignemnt[unali_reg_onset].offset,
+                        offset_time=entry.onset,
                     )
                 )
-            elif nxt_island.offset_index != len(current_alignment) - 1:
-                unaligned_regions.append(
-                    UnaliRegion(
-                        onset_index=nxt_island.offset_index+1,
-                        offset_index=len(current_alignment)-1,
-                        onset_time=current_alignment[nxt_island.offset_index+1].offset,
-                        offset_time=-1
-                    )
-                )
+                unali_reg_flag = False
+        if current_alignemnt[-1].onset == -1:
             unaligned_regions.append(
-                UnaliRegion(
-                    onset_index=island.offset_index+1,
-                    offset_index=nxt_island.onset_index-1,
-                    onset_time=current_alignment[island.offset_index].offset,
-                    offset_time=current_alignment[nxt_island.onset_index].onset
+                    UnaliRegion(
+                        onset_index=unali_reg_onset,
+                        offset_index=idx,
+                        onset_time=current_alignemnt[unali_reg_onset].offset,
+                        offset_time=-1,
+                    )
                 )
-            )
+
         return unaligned_regions
 
 
@@ -229,8 +215,7 @@ class T2TAlignment():
             hypothesis_islands=hypothesis_islands,
             text_onset_index=text_onset_index,
             segment_onset_time=segment_onset_time)
-
-        unaligned_regions = self.get_unaligned_regions(reference_islands, current_alignment)
+        unaligned_regions = self.get_unaligned_regions(current_alignment)
         
         return current_alignment, unaligned_regions
 
