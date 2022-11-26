@@ -33,6 +33,12 @@ class UnaliRegion:
     onset_time: float
     offset_time: float
 
+@dataclass
+class SegmentHypothesis:
+    segment_name: str
+    hypothesis: List[str]
+    hypothesis_ctm: List[ctmEntry]
+
 
 def thirdparty_binary(binary_name: str) -> str:
     """

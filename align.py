@@ -67,7 +67,9 @@ alignment_lab, unaligned_regions = t2talignment.run(
         segment_onset_time=.0
 )
 
-
+for entry in alignment_lab:
+        print(entry.word, entry.onset, entry.offset)
+print(unaligned_regions)
 
 segments_function = DecodeSegments(
         model_dir=model_dir_path,
@@ -83,5 +85,12 @@ segments_function = DecodeSegments(
 
 
 
-print(segments_function.decode_parallel(unaligned_regions))
-
+# print(segments_function.decode_parallel(unaligned_regions))
+segment_hypothesis = segments_function.decode_parallel(unaligned_regions)
+# segment_hypothesis = []
+# while True:
+#         try:
+#                 segment_hypothesis.append(queue.get_nowait())
+#         except queue.Empty:
+#                 break
+print(segment_hypothesis)

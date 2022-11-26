@@ -166,15 +166,15 @@ class T2TAlignment():
         
         for idx, entry in enumerate(current_alignemnt[1:]):
             if entry.onset == -1 and not unali_reg_flag:
-                unali_reg_onset = idx
+                unali_reg_onset = idx + 1
                 unali_reg_flag = True
             elif entry.onset != -1 and unali_reg_flag:
                 unaligned_regions.append(
                     UnaliRegion(
                         onset_index=unali_reg_onset,
-                        offset_index=idx-1,
+                        offset_index=idx,
                         onset_time=.0 if unali_reg_onset==0
-                            else current_alignemnt[unali_reg_onset].offset,
+                            else current_alignemnt[unali_reg_onset-1].offset,
                         offset_time=entry.onset,
                     )
                 )
@@ -184,7 +184,7 @@ class T2TAlignment():
                     UnaliRegion(
                         onset_index=unali_reg_onset,
                         offset_index=idx,
-                        onset_time=current_alignemnt[unali_reg_onset].offset,
+                        onset_time=current_alignemnt[unali_reg_onset-1].offset,
                         offset_time=-1,
                     )
                 )

@@ -1,0 +1,6 @@
+working_dir_paths:
+  wav_scp: 'wav.scp'
+  segments: 'segments'
+  feats_ark: 'feats.ark'
+  segments_data: 'segments_data'
+  lm_text: 'lm.txt'

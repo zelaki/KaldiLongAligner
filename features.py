@@ -98,7 +98,6 @@ class Mfcc():
     def make_feats(self, segment_path) -> None:
         """Run the function"""
         with open(self.log_path, "w") as log_file:
-            print(self.pitch_options)
             # use_pitch = self.pitch_options.pop("use-pitch")
             use_pitch = False
             mfcc_base_command = [thirdparty_binary("compute-mfcc-feats"), "--verbose=2"]
@@ -228,7 +227,6 @@ class Mfcc():
                 m = self.progress_pattern.match(line)
                 if m:
                     cur = int(m.group("num_utterances"))
-                    print(cur)
                     # increment = cur - processed
                     # processed = cur
                     # yield increment

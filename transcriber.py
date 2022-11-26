@@ -2,7 +2,7 @@ import typing
 import os
 import shutil
 import subprocess
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Optional
 from graph import compose_clg, compose_hclg, compose_lg, generate_text_transducer, get_tree_info
 from kaldi.asr import GmmLatticeFasterRecognizer
 from kaldi.decoder import LatticeFasterDecoderOptions
@@ -11,8 +11,10 @@ from kaldi.lat.align import WordBoundaryInfoNewOpts, WordBoundaryInfo
 from kaldi.alignment import GmmAligner
 from utils import thirdparty_binary, create_hclg_args, \
     ctmEntry, HCLGArgs, TranscriberArgs, UnaliRegion, create_mfcc_args, \
-    create_transcriber_args
+    create_transcriber_args, SegmentHypothesis
 from features import Mfcc
+from multiprocessing import Process, Queue
+
 
 
 
@@ -328,6 +330,9 @@ class DecodeSegments():
         if init:
             self.create_dirs = True
 
+        # self.segment_results: Dict[str, Optional[SegmentHypothesis]] = {}
+        self.segment_results = Queue()
+
     def create_segments_file(
         self,
         unaligned_region: List[UnaliRegion],
@@ -368,83 +373,124 @@ class DecodeSegments():
             f.write(f'<s> {text} </s>')
         return lm_text_path
 
-    def decode_segment(
-        self,
-        segment,
-        feats_ark,
-        text
+    # def decode_segment(
+    #     self,
+    #     segment,
+    #     feats_ark,
+    #     text
 
-    ) -> None:
-        self.feature_extractor.make_feats(segment_path=segment)
-        self.hclg.mkgraph(text, 'trigram')
-        hypothesis_ctm = self.transcriber.decode_ctm(feats_ark)[0][1]
-        hypothesis = self.transcriber.decode_text(feats_ark)[0][1]
+    # ) -> None:
+    #     self.feature_extractor.make_feats(segment_path=segment)
+    #     self.hclg.mkgraph(text, 'trigram')
+    #     hypothesis_ctm = self.transcriber.decode_ctm(feats_ark)[0][1]
+    #     hypothesis = self.transcriber.decode_text(feats_ark)[0][1]
 
-        return hypothesis, hypothesis_ctm
+    #     return hypothesis, hypothesis_ctm
 
     
+
+    def prepare_segment_data_dir(
+        self,
+        unaligned_region: List[UnaliRegion]
+    ) -> None:
+        segment_data_dir_path = os.path.join(
+            self.segments_dir_path,
+            f'{unaligned_region.onset_time}_{unaligned_region.offset_time}'
+    )
+        os.makedirs(segment_data_dir_path, exist_ok=True)
+        segment_feat_ark = os.path.join(
+            segment_data_dir_path,
+            'feats.ark'
+        )
+
+        segments_path = self.create_segments_file(
+            segment_data_dir_path=segment_data_dir_path,
+            unaligned_region=unaligned_region)
+        text_path, text = self.create_segment_text(
+            segment_data_dir_path=segment_data_dir_path,
+            unaligned_region=unaligned_region
+        )
+        lm_text_path = self.create_segnemt_lm_text(
+            segment_data_dir_path=segment_data_dir_path,
+            text=text
+        )
+
+
+        hclg_args = create_hclg_args(
+            self.model_dir,
+            segment_data_dir_path)
+        hclg = CreateHCLG(hclg_args)
+        hclg.mkgraph(lm_text_path, 'trigram')
+
+
+        self.feature_extractor.make_feats(
+            segment_path=segments_path)
+        
+        shutil.copyfile(
+            self.wav_scp,
+            os.path.join(segment_data_dir_path, 'wav.scp')
+            )
+        mfcc_args = create_mfcc_args(
+            self.model_dir,
+            segment_data_dir_path)
+        mfcc = Mfcc(mfcc_args)
+        mfcc.make_feats(segment_path=segments_path)
+
+        transcriber_args = create_transcriber_args(
+            self.model_dir,
+            segment_data_dir_path
+            )
+        transcriber = Transcriber(transcriber_args)
+        return segment_feat_ark, transcriber
+
+    def queue_dump(self, queue):
+        elements = []
+        while queue.qsize():
+            elements.append(queue.get())
+        return elements
+
+
+    def decode_segment(
+        self,
+        unaligned_region
+    ) -> None:
+
+        feat_ark, transcriber = self.prepare_segment_data_dir(
+                unaligned_region=unaligned_region
+            )   
+
+        if transcriber.decode_text(feat_ark) == []:
+            self.segment_results.put(None)
+        else:
+
+            hypothesis = transcriber.decode_text(feat_ark)[0][1]
+            hypothesis_ctm = transcriber.decode_ctm(feat_ark)[0][1]
+            self.segment_results.put(
+                SegmentHypothesis(
+                    segment_name=f'{unaligned_region.onset_time}_{unaligned_region.offset_time}',
+                    hypothesis=hypothesis,
+                    hypothesis_ctm=hypothesis_ctm
+                )
+            )
+
     def decode_parallel(
         self,
         unaligned_regions
     ) -> None:
-        
+
+        decode_procs = []
         for unaligned_region in unaligned_regions:
-            segment_data_dir_path = os.path.join(
-                self.segments_dir_path,
-                f'{unaligned_region.onset_time}_{unaligned_region.offset_time}'
+            decode_proc = Process(
+                target=self.decode_segment,
+                args = (unaligned_region,)
             )
-            os.makedirs(segment_data_dir_path, exist_ok=True)
-            segment_feat_ark = os.path.join(
-                segment_data_dir_path,
-                'feats.ark'
-            )
+            decode_procs.append(decode_proc)
+            decode_proc.start()
+        for decode_proc in decode_procs:
+            decode_proc.join()
 
-            segments_path = self.create_segments_file(
-                segment_data_dir_path=segment_data_dir_path,
-                unaligned_region=unaligned_region)
-            text_path, text = self.create_segment_text(
-                segment_data_dir_path=segment_data_dir_path,
-                unaligned_region=unaligned_region
-            )
-            lm_text_path = self.create_segnemt_lm_text(
-                segment_data_dir_path=segment_data_dir_path,
-                text=text
-            )
-
-
-            hclg_args = create_hclg_args(
-                self.model_dir,
-                segment_data_dir_path)
-            hclg = CreateHCLG(hclg_args)
-            hclg.mkgraph(lm_text_path, 'trigram')
-
-
-            self.feature_extractor.make_feats(
-                segment_path=segments_path)
-            
-            shutil.copyfile(
-                self.wav_scp,
-                os.path.join(segment_data_dir_path, 'wav.scp')
-                )
-            mfcc_args = create_mfcc_args(
-                self.model_dir,
-                segment_data_dir_path)
-            mfcc = Mfcc(mfcc_args)
-            mfcc.make_feats(segment_path=segments_path)
-
-            transcriber_args = create_transcriber_args(
-                self.model_dir,
-                segment_data_dir_path
-                )
-            transcriber = Transcriber(transcriber_args)
-
-
-            hypothesis = transcriber.decode_text(segment_feat_ark)[0][1]
-
-
-
-            
-        return hypothesis
+        
+        return self.queue_dump(self.segment_results)
 
 
 
