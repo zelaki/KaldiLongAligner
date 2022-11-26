@@ -124,6 +124,23 @@ class CreateHCLG():
                 env=os.environ,
             )
             to_fst_proc.communicate()
+            with open(self.g_path, 'w') as g:
+                determinize_proc = subprocess.Popen(
+                    [thirdparty_binary("fstdeterminizestar"), self.g_path],
+                    stdout=subprocess.PIPE,
+                    stderr=log_file,
+                    env=os.environ,
+                )
+                minimize_proc = subprocess.Popen(
+                    [thirdparty_binary("fstminimize")],
+                    stdin=determinize_proc.stdout,
+                    stderr=log_file,
+                    stdout=g,
+                    env=os.environ,
+                )
+                minimize_proc.communicate()
+
+            
 
         
 
@@ -231,13 +248,6 @@ class Transcriber():
 
     def __init__(
         self,
-        # final_model_path: str,
-        # tree_path: str,
-        # hclg_path: str,
-        # words_path: str,
-        # disambig_int_path: str,
-        # lexicon_fst_path: str,
-        # word_boundary_int_path: str
         args: TranscriberArgs 
     ): 
 
@@ -330,7 +340,6 @@ class DecodeSegments():
         if init:
             self.create_dirs = True
 
-        # self.segment_results: Dict[str, Optional[SegmentHypothesis]] = {}
         self.segment_results = Queue()
 
     def create_segments_file(
@@ -373,21 +382,7 @@ class DecodeSegments():
             f.write(f'<s> {text} </s>')
         return lm_text_path
 
-    # def decode_segment(
-    #     self,
-    #     segment,
-    #     feats_ark,
-    #     text
 
-    # ) -> None:
-    #     self.feature_extractor.make_feats(segment_path=segment)
-    #     self.hclg.mkgraph(text, 'trigram')
-    #     hypothesis_ctm = self.transcriber.decode_ctm(feats_ark)[0][1]
-    #     hypothesis = self.transcriber.decode_text(feats_ark)[0][1]
-
-    #     return hypothesis, hypothesis_ctm
-
-    
 
     def prepare_segment_data_dir(
         self,
