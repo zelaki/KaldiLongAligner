@@ -330,8 +330,6 @@ class DecodeSegments():
         model_dir: str,
         wav_scp: str,
         feature_extractor: Mfcc,
-        hclg: CreateHCLG,
-        transcriber: Transcriber,
         reference: List[str],
         segments_dir_path: str,
         init: bool
@@ -339,8 +337,6 @@ class DecodeSegments():
         self.model_dir = model_dir
         self.wav_scp = wav_scp
         self.feature_extractor = feature_extractor
-        self.hclg = hclg
-        self.transcriber = transcriber 
         self.reference = reference
         self.segments_dir_path = segments_dir_path
         if init:
@@ -373,7 +369,7 @@ class DecodeSegments():
         text = ' '.join(text)
         with open(text_path, 'w') as f:
             f.write(text)
-        return text_path, text
+        return text
 
     def create_segnemt_lm_text(
         self,
@@ -407,7 +403,7 @@ class DecodeSegments():
         segments_path = self.create_segments_file(
             segment_data_dir_path=segment_data_dir_path,
             unaligned_region=unaligned_region)
-        text_path, text = self.create_segment_text(
+        text = self.create_segment_text(
             segment_data_dir_path=segment_data_dir_path,
             unaligned_region=unaligned_region
         )
@@ -469,8 +465,11 @@ class DecodeSegments():
             self.segment_results.put(
                 SegmentHypothesis(
                     segment_name=f'{unaligned_region.onset_time}_{unaligned_region.offset_time}',
+                    onset_index = unaligned_region.onset_index,
+                    onset_time = unaligned_region.onset_time,
                     hypothesis=hypothesis,
                     hypothesis_ctm=hypothesis_ctm
+                    
                 )
             )
 

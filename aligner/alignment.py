@@ -251,6 +251,7 @@ class T2TAlignment():
         hypothesis_t2t = self.text_to_text_align(hypothesis, reference)
         reference_islands = self.text_to_text_islands(reference_t2t)
         hypothesis_islands = self.text_to_text_islands(hypothesis_t2t)
+        
         if current_alignment == None:
             current_alignment = self.initialize_alignment(reference=reference)
 

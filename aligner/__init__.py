@@ -4,3 +4,4 @@ import aligner.graph
 import aligner.transcriber
 import aligner.utils
 import aligner.config
+import aligner.segmenter

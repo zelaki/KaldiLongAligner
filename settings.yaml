@@ -4,3 +4,7 @@ working_dir_paths:
   feats_ark: 'feats.ark'
   segments_data: 'segments_data'
   lm_text: 'lm.txt'
+
+vad:
+  vad_access_token: "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"
+  duration: 15

@@ -37,7 +37,17 @@ class UnaliRegion:
 class SegmentHypothesis:
     segment_name: str
     hypothesis: List[str]
+    onset_index: int
+    onset_time: float
     hypothesis_ctm: List[ctmEntry]
+
+@dataclass
+class VADSegement:
+    onset_time: float
+    offset_time: float
+
+    def duration(self) -> float:
+        return self.offset_time - self.onset_time
 
 
 def thirdparty_binary(binary_name: str) -> str:
