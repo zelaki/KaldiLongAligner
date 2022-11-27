@@ -3,7 +3,7 @@ import os
 import math
 import io
 from typing import TextIO
-from utils import thirdparty_binary
+from aligner.utils import thirdparty_binary
 
 def compose_lg(dictionary_path: str, small_g_path: str, lg_path: str, log_file: TextIO) -> None:
     """

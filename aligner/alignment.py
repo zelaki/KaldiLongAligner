@@ -1,28 +1,11 @@
 from typing import List, Tuple, Optional
 from kaldialign import align
 from dataclasses import dataclass
-from utils import IslandSegment, ctmEntry, labEntry, UnaliRegion
+from aligner.utils import IslandSegment, ctmEntry, labEntry, UnaliRegion
 
 class T2TAlignment():
 
-    # def __init__(
-    #     self
-    #     reference: List[str],
-    #     # hypothesis: List[str],
-    #     # hypothesis_ctm: List[ctmEntry], 
-    #     # current_alignment: Optional[List[labEntry]],
-    #     # text_onset_index: int,
-    #     # segment_onset_time: float,
-    #     # init: bool
-    # ):
 
-        # self.reference = reference
-        # self.hypothesis = hypothesis
-        # self.hypothesis_ctm = hypothesis_ctm
-        # self.current_alignment = current_alignment
-        # self.text_onset_index = text_onset_index
-        # self.segment_onset_time = segment_onset_time
-        # self.init = init
 
     
     def text_to_text_align(self, reference, hypothesis, EPS: str = "*") -> str:
@@ -116,8 +99,30 @@ class T2TAlignment():
         hypothesis_islands: List[IslandSegment],
         text_onset_index: int,
         segment_onset_time: float
-        # log_path
-        ):
+        ) -> List[labEntry]:
+        """
+        Updates the current alignment
+
+        Parameters
+        ----------
+        current_alignment: List[labEntry]
+            current alignment represented as a list of lab format entries
+        hypothesis_ctm: List[ctmEntry]
+            Time aligned hypothesis in ctm format
+        reference_island:
+            List of onsets and offsets of aligned regions with respect to reference
+        hypothesis_islands:
+            List of onsets and offsets of aligned regions with respect to hypothesis
+        text_onset_index:
+            Index of first word
+        segment_onset_time:
+            Timing of first word
+
+        Returns
+        -------
+        List[labEntry]
+            Current alignment updated
+        """
 
         try:
             assert len(reference_islands) == len(hypothesis_islands)
@@ -155,7 +160,23 @@ class T2TAlignment():
     def get_unaligned_regions(
         self,
         current_alignemnt: List[labEntry]
-    ):
+    ) -> List[UnaliRegion]:
+        """
+        Returns a list of unaligned regions
+        !!!THIS IS A HORRIBLY WRITTEN FUNCTION!!!
+
+        Parameters
+        ----------
+        current_alignment: List[labEntry]
+            current alignment represented as a list of lab format entries
+        
+        Returns
+        -------
+        List[UnaliRegion]
+            List of unaligned regions
+        """
+
+    
 
         unaligned_regions = []
         if current_alignemnt[0].onset == -1:
@@ -200,7 +221,32 @@ class T2TAlignment():
             current_alignment: Optional[List[labEntry]],
             text_onset_index: int,
             segment_onset_time: float,
-            ):
+            ) -> Tuple[List[labEntry], List[UnaliRegion]] :
+        """
+        Performs text to text alignment bettewn <reference> and <hypothesis>
+
+        Parameters
+        ----------
+        current_alignment: List[labEntry]
+            current alignment represented as a list of lab format entries
+        hypothesis_ctm: List[ctmEntry]
+            Time aligned hypothesis in ctm format
+        reference_island:
+            List of onsets and offsets of aligned regions with respect to reference
+        hypothesis_islands:
+            List of onsets and offsets of aligned regions with respect to hypothesis
+        text_onset_index:
+            Index of first word
+        segment_onset_time:
+            Timing of first word
+
+        Returns
+        -------
+        Tuple[List[labEntry], List[UnaliRegion]]
+            Current alignment updated and remaining unaligned regions
+        """
+
+
         reference_t2t = self.text_to_text_align(reference, hypothesis)
         hypothesis_t2t = self.text_to_text_align(hypothesis, reference)
         reference_islands = self.text_to_text_islands(reference_t2t)

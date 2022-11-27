@@ -3,17 +3,17 @@ import os
 import shutil
 import subprocess
 from typing import List, Tuple, Dict, Optional
-from graph import compose_clg, compose_hclg, compose_lg, generate_text_transducer, get_tree_info
+from multiprocessing import Process, Queue
 from kaldi.asr import GmmLatticeFasterRecognizer
 from kaldi.decoder import LatticeFasterDecoderOptions
 from kaldi.util.table import SequentialMatrixReader
 from kaldi.lat.align import WordBoundaryInfoNewOpts, WordBoundaryInfo
 from kaldi.alignment import GmmAligner
-from utils import thirdparty_binary, create_hclg_args, \
-    ctmEntry, HCLGArgs, TranscriberArgs, UnaliRegion, create_mfcc_args, \
-    create_transcriber_args, SegmentHypothesis
-from features import Mfcc
-from multiprocessing import Process, Queue
+from aligner.graph import compose_clg, compose_hclg, compose_lg, generate_text_transducer, get_tree_info
+from aligner.utils import thirdparty_binary, ctmEntry, UnaliRegion, SegmentHypothesis
+from aligner.config import create_hclg_args, create_mfcc_args, create_transcriber_args, \
+    HCLGArgs, TranscriberArgs
+from aligner.features import Mfcc
 
 
 
@@ -124,21 +124,21 @@ class CreateHCLG():
                 env=os.environ,
             )
             to_fst_proc.communicate()
-            with open(self.g_path, 'w') as g:
-                determinize_proc = subprocess.Popen(
-                    [thirdparty_binary("fstdeterminizestar"), self.g_path],
-                    stdout=subprocess.PIPE,
-                    stderr=log_file,
-                    env=os.environ,
-                )
-                minimize_proc = subprocess.Popen(
-                    [thirdparty_binary("fstminimize")],
-                    stdin=determinize_proc.stdout,
-                    stderr=log_file,
-                    stdout=g,
-                    env=os.environ,
-                )
-                minimize_proc.communicate()
+            # with open(self.g_path, 'w') as g:
+            #     determinize_proc = subprocess.Popen(
+            #         [thirdparty_binary("fstdeterminizestar"), self.g_path],
+            #         stdout=subprocess.PIPE,
+            #         stderr=log_file,
+            #         env=os.environ,
+            #     )
+            #     minimize_proc = subprocess.Popen(
+            #         [thirdparty_binary("fstminimize")],
+            #         stdin=determinize_proc.stdout,
+            #         stderr=log_file,
+            #         stdout=g,
+            #         env=os.environ,
+            #     )
+            #     minimize_proc.communicate()
 
             
 
@@ -155,8 +155,15 @@ class CreateHCLG():
 
             context_width = get_tree_info(self.tree_path, log_file, 'context-width')
             central_pos = get_tree_info(self.tree_path, log_file, 'central-position')
-            ilabels_temp = f"ilabels_{context_width}_{central_pos}"
-            out_disambig = f"disambig_ilabels_{context_width}_{central_pos}"
+            ilabels_temp = os.path.join(
+                self.graph_directory,
+                f"ilabels_{context_width}_{central_pos}"
+            )
+            out_disambig = os.path.join(
+                self.graph_directory,
+                f"disambig_ilabels_{context_width}_{central_pos}",
+            )                
+
 
             log_file.write("Generating CLG.fst...")
             compose_clg(
@@ -276,7 +283,6 @@ class Transcriber():
             decoder_opts=self.decoder_opts)
 
     def decode(self, feats_ark):
-        # Decode
         out = []
         for key, feats in SequentialMatrixReader(f'ark:{feats_ark}'):
             out.append((key, self.asr.decode(feats)))

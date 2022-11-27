@@ -1,11 +1,10 @@
 import os
-from transcriber import CreateHCLG, Transcriber, DecodeSegments
+from aligner.transcriber import CreateHCLG, Transcriber, DecodeSegments
 from kaldialign import align
-from features import Mfcc
-from utils import arg_parser, read_reference_text, \
-        create_hclg_args, create_transcriber_args, \
-        create_mfcc_args, initialize_working_dir, read_yaml_file
-from alignment import T2TAlignment
+from aligner.features import Mfcc
+from aligner.utils import arg_parser, read_reference_text, initialize_working_dir, read_yaml_file
+from aligner.config import create_transcriber_args, create_mfcc_args, create_hclg_args
+from aligner.alignment import T2TAlignment
 
 
 
@@ -17,27 +16,26 @@ transcription_path= args.t
 model_dir_path = args.m
 working_dir_path = args.w
 init_segment = os.path.join(
-        working_dir_path,
-        config['working_dir_paths']['segments']
+working_dir_path,
+config['working_dir_paths']['segments']
 )
 init_feats_ark = os.path.join(
         working_dir_path,
         config['working_dir_paths']['feats_ark']
 )
-segments_data_dirs = os.path.join(
-        working_dir_path,
-        config['working_dir_paths']['segments_data']
-)
 lm_text = os.path.join(
         working_dir_path,
         config['working_dir_paths']['lm_text']
+)
+segments_data_dirs = os.path.join(
+        working_dir_path,
+        config['working_dir_paths']['segments_data']
 )
 initialize_working_dir(
         audio_path,
         transcription_path,
         working_dir_path,
-        segments_data_dirs,
-        lm_text)
+        config)
 
 hclg_args = create_hclg_args(model_dir_path, working_dir_path)
 transcriber_args = create_transcriber_args(model_dir_path, working_dir_path)
@@ -49,12 +47,14 @@ mfcc.make_feats(segment_path=init_segment)
 
 
 hclg.mkgraph(lm_text, 'trigram')
+
 transcriber = Transcriber(transcriber_args)
 
 hypothesis_ctm = transcriber.decode_ctm(init_feats_ark)[0][1]
 hypothesis = transcriber.decode_text(init_feats_ark)[0][1]
 hypothesis = hypothesis.split()
 reference = read_reference_text(transcription_path)
+
 
 
 t2talignment = T2TAlignment()
@@ -70,6 +70,8 @@ alignment_lab, unaligned_regions = t2talignment.run(
 for entry in alignment_lab:
         print(entry.word, entry.onset, entry.offset)
 print(unaligned_regions)
+
+exit(1)
 
 segments_function = DecodeSegments(
         model_dir=model_dir_path,
