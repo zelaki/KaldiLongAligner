@@ -47,13 +47,15 @@ hclg = CreateHCLG(hclg_args)
 mfcc = Mfcc(mfcc_args)
 
 
-segmenter = Segmenter(access_token=vad_access_token, segment_duration=15)
-segmenter.run(working_dir_path, audio_path)
+# segmenter = Segmenter(access_token=vad_access_token, segment_duration=15)
+# segmenter.run(working_dir_path, audio_path)
 
 mfcc.make_feats(segment_path=init_segment)
-
+# exit(1)
 hclg.mkgraph(lm_text, 'trigram')
 
+transcriber = Transcriber(transcriber_args)
+print(transcriber.decode_text(init_feats_ark))
 hypothesis_ctm = transcriber.decode_ctm(init_feats_ark)[0][1]
 hypothesis = transcriber.decode_text(init_feats_ark)[0][1]
 hypothesis = hypothesis.split()
@@ -71,7 +73,9 @@ current_alignment, unaligned_regions = t2talignment.run(
         segment_onset_time=.0
 )
 
-
+with open('greek_text.lab', 'w') as f:
+        for entry in current_alignment:
+                f.write(f'{entry.onset} {entry.offset} {entry.word}\n')
 
 segments_function = DecodeSegments(
         model_dir=model_dir_path,
@@ -85,16 +89,21 @@ segments_function = DecodeSegments(
 
 
 
-# unaligned_regions_hypothesis = segments_function.decode_parallel(unaligned_regions)
-# print(unaligned_regions_hypothesis)
-# for segment_data in unaligned_regions_hypothesis:
-#         reference = read_reference_text(f'working_dir/segments_data/{segment_data.segment_name}/text')
+unaligned_regions_hypothesis = segments_function.decode_parallel(unaligned_regions)
+for iter in range(3):
+        for segment_data in unaligned_regions_hypothesis:
+                reference = read_reference_text(f'working_dir/segments_data/{segment_data.segment_name}/text')
 
-#         current_alignment, unaligned_regions = t2talignment.run(
-#         reference=reference,
-#         hypothesis=segment_data.hypothesis.split(),
-#         hypothesis_ctm=segment_data.hypothesis_ctm,
-#         current_alignment = current_alignment,
-#         text_onset_index=segment_data.onset_index,
-#         segment_onset_time=segment_data.onset_time
-# )
+                current_alignment, unaligned_regions = t2talignment.run(
+                reference=reference,
+                hypothesis=segment_data.hypothesis.split(),
+                hypothesis_ctm=segment_data.hypothesis_ctm,
+                current_alignment = current_alignment,
+                text_onset_index=segment_data.onset_index,
+                segment_onset_time=segment_data.onset_time
+        )
+
+        with open('greek_text_iter{iter}.lab', 'w') as f:
+                for entry in current_alignment:
+                        f.write(f'{entry.onset} {entry.offset} {entry.word}\n')
+

@@ -1,7 +1,7 @@
 
 import os
 from dataclasses import dataclass 
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 
 MetaDict = Dict[str, Any]
 
@@ -28,7 +28,8 @@ class TranscriberArgs():
 @dataclass
 class MFCCArgs():
     wav_path: str
-    feats_scp_path: str 
+    feats_scp_path: str
+    splice_opts: Tuple[int, int]
     mfcc_options: MetaDict
     pitch_options: MetaDict
     final_matrix: str
@@ -37,9 +38,15 @@ class MFCCArgs():
 def create_mfcc_args(model_dir_path, working_dir_path):
 
     features_config = FeatureConfigMixin()
+    with open(os.path.join(model_dir_path, 'splice_opts'), 'r') as f:
+        line = f.readline().split()
+        left_context = line[0].split('=')[1]
+        right_context = line[1].split('=')[1]
+
     args = MFCCArgs(
         wav_path = os.path.join(working_dir_path, 'wav.scp'),
         feats_scp_path = os.path.join(working_dir_path, 'feats.scp'),
+        splice_opts=(left_context, right_context),
         mfcc_options = features_config.mfcc_options,
         pitch_options = features_config.pitch_options,
         final_matrix=os.path.join(model_dir_path, 'final.mat'),

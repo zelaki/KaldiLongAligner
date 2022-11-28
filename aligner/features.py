@@ -81,12 +81,7 @@ class Mfcc():
 
     def __init__(self,
                 args
-                #  wav_path,
-                # feats_scp_path,
-                # mfcc_options,
-                # pitch_options,
-                # final_matrix,
-                # log_path
+
         ):
         self.wav_path = args.wav_path
         self.feats_scp_path = args.feats_scp_path
@@ -94,6 +89,8 @@ class Mfcc():
         self.mfcc_options = args.mfcc_options
         self.pitch_options = args.pitch_options
         self.log_path = args.log_path
+        self.left_context = args.splice_opts[0]
+        self.right_context = args.splice_opts[1]
 
     def make_feats(self, segment_path) -> None:
         """Run the function"""
@@ -135,7 +132,7 @@ class Mfcc():
                 )
 
                 splice_proc = subprocess.Popen(
-                    [thirdparty_binary('splice-feats'), "--left-context=5", "--right-context=5", "ark:-", "ark:-"],
+                    [thirdparty_binary('splice-feats'), f"--left-context={self.left_context}", f"--right-context={self.right_context}", "ark:-", "ark:-"],
                     stdin=cmvn_proc.stdout,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
