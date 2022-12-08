@@ -75,30 +75,33 @@ class CreateHCLG():
         else:
             generate_text_transducer(lmtext_path, self.words_path, self.g_text_path)
         
-        with open(self.log_file_path, 'a') as log_file, open(self.g_path, 'w') as g:
-            compile_proc = subprocess.Popen(
-                [thirdparty_binary("fstcompile"), f"--isymbols={self.words_path}",
-                f"--osymbols={self.words_path}", self.g_text_path],
-                    stderr=log_file,
-                    stdout=subprocess.PIPE,
-                    env=os.environ,
-            )
-            determinize_proc = subprocess.Popen(
-                [thirdparty_binary("fstdeterminizestar")],
-                stdin=compile_proc.stdout,
-                stdout=g,
-                stderr=log_file,
-                env=os.environ,
-            )
-            minimize_proc = subprocess.Popen(
-                [thirdparty_binary("fstminimize")],
-                stdin=determinize_proc.stdout,
-                stderr=log_file,
-                # stdout=g,
-                env=os.environ,
+        with open(self.log_file_path, 'a') as log_file:
+            with open(self.g_path, 'w') as g:
+                # compile_proc = subprocess.Popen(
+                #     [thirdparty_binary("fstcompile"), f"--isymbols={self.words_path}",
+                #     f"--osymbols={self.words_path}", self.g_text_path],
+                #         stderr=log_file,
+                #         stdout=subprocess.PIPE,
+                #         env=os.environ,
+                # )
+                # determinize_proc = subprocess.Popen(
+                #     [thirdparty_binary("fstdeterminizestar")],
+                #     stdin=compile_proc.stdout,
+                #     stdout=subprocess.PIPE,
+                #     stderr=log_file,
+                #     env=os.environ,
+                # )
+                # subprocess.Popen(
+                #     [thirdparty_binary("fstminimize")],
+                #     stdin=determinize_proc.stdout,
+                #     stderr=log_file,
+                #     stdout=g,
+                #     env=os.environ,
 
-            )
-            determinize_proc.communicate()
+                # )
+                print(f'{thirdparty_binary("fstcompile")} --isymbols={self.words_path} --osymbols={self.words_path} {self.g_text_path} | fstdeterminizestar | fstminimize> {self.g_path}')
+                subprocess.call(f'{thirdparty_binary("fstcompile")} --isymbols={self.words_path} --osymbols={self.words_path} {self.g_text_path} | fstdeterminizestar | fstminimize> {self.g_path}', shell=True)
+                # minimize_proc.communicate()
             
 
     def make_trigram(self, lmtext_path: str):
@@ -115,7 +118,6 @@ class CreateHCLG():
                 stderr=log_file,
                 env=os.environ,
             )
-
             to_fst_proc = subprocess.Popen(
                 [thirdparty_binary("arpa2fst"), "--disambig-symbol=#0",
                 f"--read-symbol-table={self.words_path}", "-", self.g_path],
@@ -123,6 +125,8 @@ class CreateHCLG():
                 stderr=log_file,
                 env=os.environ,
             )
+            print(thirdparty_binary("arpa2fst"), "--disambig-symbol=#0",
+                f"--read-symbol-table={self.words_path}", "-", self.g_path)
             to_fst_proc.communicate()
             # with open(self.g_path, 'w') as g:
             #     determinize_proc = subprocess.Popen(
@@ -288,19 +292,29 @@ class Transcriber():
             out.append((key, self.asr.decode(feats)))
         return out
 
-    def decode_text(self, feats_ark):
-        """
-        Transcribe audio from features.
+    # def decode_text(self, feats_ark):
+    #     """
+    #     Transcribe audio from features.
 
-        Parameters
-        ----------
-        feats_ark: str
-            Path to feats_ark
+    #     Parameters
+    #     ----------
+    #     feats_ark: str
+    #         Path to feats_ark
         
-        """
-        return [(key, t['text']) for key, t in self.decode(feats_ark)]
+    #     """
+    #     return [(key, t['text']) for key, t in self.decode(feats_ark)]
 
+    def fix_ctm_timing(self, hypothesis_ctm):
 
+        hypothesis_ctm_fixed = []
+        for key, segment_ctm in hypothesis_ctm:
+            segment_onset_time = round(float(key.split("_")[1]) * 100)
+            hypothesis_ctm_fixed+=[ctmEntry( 
+                word=entry.word,
+                onset=entry.onset + segment_onset_time,
+                duration=entry.duration
+                ) for entry in segment_ctm]
+        return hypothesis_ctm_fixed
 
     def decode_ctm(self, feats_ark):
         """
@@ -311,15 +325,19 @@ class Transcriber():
         feats_ark: str
             Path to feats_ark
         """
-
+        hypothesis = [hyp for hyps in [t['text'].split() for _, t in self.decode(feats_ark)] for hyp in hyps]
         best_paths = [(key, t['best_path']) for key, t in  self.decode(feats_ark)]
         aligner = GmmAligner.from_files("gmm-boost-silence --boost=1.0 1 {} - |".format(self.final_model_path),
                                         self.tree_path, self.lexicon_fst_path, self.words_path, self.disambig_int_path,
                                         self_loop_scale=0.1)
-        return [(key, [ctmEntry(word=w, onset=on, duration=dur) \
+        
+        hypothesis_ctm =  [(key, [ctmEntry(word=w, onset=on, duration=dur) \
                 for w, on, dur in aligner.to_word_alignment(best_path=best_path, word_boundary_info=self.wb_info) if w!= '<eps>']) \
                 for key, best_path in best_paths]
-
+        hypothesis_ctm = self.fix_ctm_timing(hypothesis_ctm)
+        # hypothesis_ctm = [hyp for hyps in hypothesis_ctm for hyp in hyps]
+        
+        return hypothesis, hypothesis_ctm
 
 
 
@@ -388,12 +406,16 @@ class DecodeSegments():
 
     def prepare_segment_data_dir(
         self,
-        unaligned_region: List[UnaliRegion]
+        unaligned_region: List[UnaliRegion],
+        lattice_type: str
+
     ) -> None:
         segment_data_dir_path = os.path.join(
             self.segments_dir_path,
             f'{unaligned_region.onset_time}_{unaligned_region.offset_time}'
     )
+        if os.path.exists(segment_data_dir_path):
+            shutil.rmtree(segment_data_dir_path)
         os.makedirs(segment_data_dir_path, exist_ok=True)
         segment_feat_ark = os.path.join(
             segment_data_dir_path,
@@ -417,7 +439,7 @@ class DecodeSegments():
             self.model_dir,
             segment_data_dir_path)
         hclg = CreateHCLG(hclg_args)
-        hclg.mkgraph(lm_text_path, 'trigram')
+        hclg.mkgraph(lm_text_path, lattice_type)
 
 
         self.feature_extractor.make_feats(
@@ -449,19 +471,19 @@ class DecodeSegments():
 
     def decode_segment(
         self,
-        unaligned_region
+        unaligned_region,
+        lattice_type: str
+
     ) -> None:
 
         feat_ark, transcriber = self.prepare_segment_data_dir(
-                unaligned_region=unaligned_region
+                unaligned_region=unaligned_region,
+                lattice_type = lattice_type
             )   
-
-        if transcriber.decode_text(feat_ark) == []:
+        hypothesis, hypothesis_ctm =transcriber.decode_ctm(feat_ark)
+        if hypothesis == []:
             self.segment_results.put(None)
         else:
-
-            hypothesis = transcriber.decode_text(feat_ark)[0][1]
-            hypothesis_ctm = transcriber.decode_ctm(feat_ark)[0][1]
             self.segment_results.put(
                 SegmentHypothesis(
                     segment_name=f'{unaligned_region.onset_time}_{unaligned_region.offset_time}',
@@ -475,14 +497,16 @@ class DecodeSegments():
 
     def decode_parallel(
         self,
-        unaligned_regions
+        unaligned_regions,
+        lattice_type: str
+
     ) -> None:
 
         decode_procs = []
         for unaligned_region in unaligned_regions:
             decode_proc = Process(
                 target=self.decode_segment,
-                args = (unaligned_region,)
+                args = (unaligned_region, lattice_type)
             )
             decode_procs.append(decode_proc)
             decode_proc.start()

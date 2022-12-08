@@ -26,6 +26,79 @@ class TranscriberArgs():
     word_boundary_int_path: str 
 
 @dataclass
+class FmllrDecodingArgs():
+    word_insertion_penalty: float
+    frame_shift: float
+    max_active: int
+    beam: float
+    lattice_beam: float
+    words_path: str
+    acoustic_scale: float
+    final_model: str
+    final_mat: str
+    hclg_path: str
+    spk2utt: str
+    feats: str
+    cmvn_ark: str
+    cmvn_scp: str
+    left_context: int
+    right_context: int
+    word_boundary_int: str
+    feature_string: str
+    lat_path: str
+    fmllr_update_type: str
+    sil_phones: str
+    silence_weight: float
+    pre_trans_path: str
+    tmp_lat: str
+    temp_trans_path: str
+    trans_path: str
+    final_lat_path: str
+
+
+def create_fmllr_args(
+    working_dir,
+    model_dir_path,
+    config) -> FmllrDecodingArgs:
+
+    left_context, right_context = get_splice_context(model_dir_path)
+    final_mat = os.path.join(model_dir_path, 'final.mat')
+    args = FmllrDecodingArgs(
+        word_insertion_penalty = config['decoding_options']['word_insertion_penalty'],
+        frame_shift = 0.01,
+        acoustic_scale = config['decoding_options']['acoustic_scale'],
+        max_active = config['decoding_options']['max_active'],
+        beam = config['decoding_options']['beam'],
+        lattice_beam = config['decoding_options']['lattice_beam'],
+        words_path = os.path.join(model_dir_path, 'words.txt'),
+        final_model = os.path.join(model_dir_path, 'final.mdl'),
+        final_mat = final_mat,
+        hclg_path = os.path.join(working_dir, "graph_dir", "HCLG.fst"),
+        spk2utt = os.path.join(working_dir,"utt2spk"),
+        feats = os.path.join(working_dir,"feats.scp"),
+        cmvn_ark = os.path.join(working_dir, "cmvn.ark"),
+        cmvn_scp = os.path.join(working_dir,"cmvn.scp"),
+        left_context=left_context,
+        right_context=right_context,
+        word_boundary_int = os.path.join(model_dir_path, 'word_boundary.int'),
+        feature_string = f"ark,s,cs:apply-cmvn --utt2spk=ark:{working_dir}/utt2spk \
+            scp:{working_dir}/cmvn.scp scp:{working_dir}/feats.scp ark:-| \
+            splice-feats --left-context={left_context} --right-context={right_context} ark:- ark:- |\
+            transform-feats {final_mat} ark:- ark:- |",
+        lat_path = os.path.join(working_dir,'lat.1'),
+        fmllr_update_type = "full",
+        sil_phones = "1:2:3:4:5:6:7:8:9:10",
+        silence_weight = 0.01,
+        pre_trans_path = "pre_trans.1",
+        tmp_lat = os.path.join(working_dir,'tmp_lat.1'),
+        temp_trans_path= os.path.join(working_dir, 'trans_tmp'),
+        trans_path = os.path.join(working_dir,"trans.1"),
+        final_lat_path = os.path.join(working_dir,"fmllr_lat.1")
+    )
+    return args
+
+
+@dataclass
 class MFCCArgs():
     wav_path: str
     feats_scp_path: str
@@ -34,6 +107,16 @@ class MFCCArgs():
     pitch_options: MetaDict
     final_matrix: str
     log_path: str
+
+
+def get_splice_context(model_dir_path):
+    with open(os.path.join(model_dir_path, 'splice_opts'), 'r') as f:
+        line = f.readline().split()
+        left_context = line[0].split('=')[1]
+        right_context = line[1].split('=')[1]
+    return left_context, right_context
+
+
 
 def create_mfcc_args(model_dir_path, working_dir_path):
 

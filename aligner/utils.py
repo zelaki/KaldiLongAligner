@@ -133,7 +133,19 @@ def initialize_working_dir(
     segments = os.path.join(working_dir_path, 'segments')
     with open(segments, 'w') as f:
         f.write('key_1 key_1 0 -1')
-    
+
+    # create spk2utt
+    segments = os.path.join(working_dir_path, 'spk2utt')
+    with open(segments, 'w') as f:
+        f.write('key_1 key_1\n')
+
+    # create utt2spk
+    segments = os.path.join(working_dir_path, 'utt2spk')
+    with open(segments, 'w') as f:
+        f.write('key_1 key_1\n')
+
+
+
     # create lm text
     with open(lm_text_path, 'w') as lm:
         with open(transcription_path, 'r') as transc:

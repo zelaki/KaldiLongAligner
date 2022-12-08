@@ -8,3 +8,11 @@ working_dir_paths:
 vad:
   vad_access_token: "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"
   duration: 15
+
+
+decoding_options:
+  beam: 13.0
+  lattice_beam: 6.0
+  acoustic_scale: 0.1
+  max_active: 7000
+  word_insertion_penalty: 1.0

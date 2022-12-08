@@ -72,6 +72,5 @@ class Segmenter():
       ) -> None:
 
       vad_segments = self.run_vad(audio_path)
-      print(vad_segments)
       self.create_segments_from_vad(data_dir_path, vad_segments)
 

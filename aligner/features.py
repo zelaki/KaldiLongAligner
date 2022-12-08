@@ -116,36 +116,36 @@ class Mfcc():
                     stderr=log_file,
                     env=os.environ
                 )
-                comp1_proc = subprocess.Popen(
+                comp_proc = subprocess.Popen(
                     mfcc_base_command,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     stdin=seg_proc.stdout,
                     env=os.environ
                 )
-                cmvn_proc = subprocess.Popen(
-                    [thirdparty_binary('apply-cmvn-sliding'), "--cmn-window=10000", "--center=true", "ark:-", "ark:-"],
-                    stdin=comp1_proc.stdout,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    env=os.environ
-                )
+                # cmvn_proc = subprocess.Popen(
+                #     [thirdparty_binary('apply-cmvn-sliding'), "--cmn-window=10000", "--center=true", "ark:-", "ark:-"],
+                #     stdin=comp1_proc.stdout,
+                #     stdout=subprocess.PIPE,
+                #     stderr=subprocess.PIPE,
+                #     env=os.environ
+                # )
 
-                splice_proc = subprocess.Popen(
-                    [thirdparty_binary('splice-feats'), f"--left-context={self.left_context}", f"--right-context={self.right_context}", "ark:-", "ark:-"],
-                    stdin=cmvn_proc.stdout,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    env=os.environ
-                )
+                # splice_proc = subprocess.Popen(
+                #     [thirdparty_binary('splice-feats'), f"--left-context={self.left_context}", f"--right-context={self.right_context}", "ark:-", "ark:-"],
+                #     stdin=cmvn_proc.stdout,
+                #     stdout=subprocess.PIPE,
+                #     stderr=subprocess.PIPE,
+                #     env=os.environ
+                # )
 
-                comp_proc = subprocess.Popen(
-                    [thirdparty_binary('transform-feats'), self.final_matrix, "ark:-", "ark:-"],
-                    stdin=splice_proc.stdout,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    env=os.environ
-                )
+                # comp_proc = subprocess.Popen(
+                #     [thirdparty_binary('transform-feats'), self.final_matrix, "ark:-", "ark:-"],
+                #     stdin=splice_proc.stdout,
+                #     stdout=subprocess.PIPE,
+                #     stderr=subprocess.PIPE,
+                #     env=os.environ
+                # )
 
 
             else:

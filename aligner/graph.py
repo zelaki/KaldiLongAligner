@@ -281,6 +281,7 @@ def generate_text_transducer(lm_text: str, words_path: str, g_text_path:str, ski
                 f.write('{} {} {} {} {}\n'.format(idx-1, idx, '<eps>', '<eps>', -math.log(0.05,10)))
 
             idx+=1
+        f.write(f'{idx-1}\n')
 
 # if __name__ == '__main__':
 #     words_path = '/home/theokouz/kaldi/egs/betterReading/s5/data/lang_kids_new/words.txt'

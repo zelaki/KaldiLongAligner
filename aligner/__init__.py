@@ -5,3 +5,4 @@ import aligner.transcriber
 import aligner.utils
 import aligner.config
 import aligner.segmenter
+import aligner.fmllr_decoding

@@ -60,6 +60,29 @@ class T2TAlignment():
         List[IslandSegment]
             List of start and end insex of each island
         """
+        # if alignment[0] == 'C':
+        #     cur_island_len = 1
+        #     on_island = True
+        #     island_onset = 0
+        # else:
+        #     cur_island_len = 0
+        #     on_island = False
+        # islands = []
+        # for idx, sym in enumerate(alignment[1:]):
+
+        #     if sym == 'C' and not on_island:
+        #         cur_island_len = 1
+        #         island_onset = idx + 1
+        #     elif sym == 'C' and on_island:
+        #         cur_island_len += 1
+        #     elif sym != 'C' and on_island and cur_island_len >= island_length:
+        #         islands.append(
+        #             IslandSegment(
+        #                 onset_index=island_onset,
+        #                 offset_index=idx
+        #             )
+        #         )
+
         islands = []
 
         if len(alignment) in [1,2,3]:
@@ -248,10 +271,19 @@ class T2TAlignment():
 
 
         reference_t2t = self.text_to_text_align(reference, hypothesis)
-        hypothesis_t2t = self.text_to_text_align(hypothesis, reference)
+        hypothesis_t2t = ''
+        for sym in reference_t2t:
+            if sym == 'D':
+                hypothesis_t2t+='I'
+            elif sym == 'I':
+                hypothesis_t2t+='D'
+            else:
+                hypothesis_t2t+=sym
+        # hypothesis_t2t = self.text_to_text_align(hypothesis, reference)
+
         reference_islands = self.text_to_text_islands(reference_t2t)
         hypothesis_islands = self.text_to_text_islands(hypothesis_t2t)
-        
+
         if current_alignment == None:
             current_alignment = self.initialize_alignment(reference=reference)
 
