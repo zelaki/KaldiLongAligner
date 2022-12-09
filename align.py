@@ -60,7 +60,7 @@ hclg.mkgraph(lm_text, 'trigram')
 transcriber = Transcriber(fmllr_args)
 hypothesis, hypothesis_ctm = transcriber.decode(working_dir_path)
 reference = read_reference_text(transcription_path)
-print(hypothesis)
+
 t2talignment = T2TAlignment()
 current_alignment, unaligned_regions = t2talignment.run(
         reference=reference,
@@ -70,23 +70,33 @@ current_alignment, unaligned_regions = t2talignment.run(
         text_onset_index=0,
         segment_onset_time=.0
 )
-exit(1)
-with open('greek_text.lab', 'w') as f:
+
+
+
+with open('alignment.lab', 'w') as f:
         for entry in current_alignment:
                 f.write(f'{entry.onset} {entry.offset} {entry.word}\n')
+
+
+
+
+
+
 segments_function = DecodeSegments(
         model_dir=model_dir_path,
         wav_scp=os.path.join(working_dir_path, 'wav.scp'),
         feature_extractor=mfcc,
         reference=reference,
         segments_dir_path=segments_data_dirs,
-        init = True
+        init = True,
+        config=config
 )
 
 
 lattice_type = 'trigram'
 unaligned_regions_hypothesis = segments_function.decode_parallel(unaligned_regions, lattice_type)
 print(unaligned_regions_hypothesis)
+exit(1)
 for iter in range(3):
         for segment_data in unaligned_regions_hypothesis:
                 if segment_data==None: continue

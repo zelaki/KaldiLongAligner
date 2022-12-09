@@ -89,7 +89,7 @@ def create_fmllr_args(
         fmllr_update_type = "full",
         sil_phones = "1:2:3:4:5:6:7:8:9:10",
         silence_weight = 0.01,
-        pre_trans_path = "pre_trans.1",
+        pre_trans_path = os.path.join(working_dir,"pre_trans.1"),
         tmp_lat = os.path.join(working_dir,'tmp_lat.1'),
         temp_trans_path= os.path.join(working_dir, 'trans_tmp'),
         trans_path = os.path.join(working_dir,"trans.1"),

@@ -173,8 +173,13 @@ class T2TAlignment():
                 except:
                     print('Words in correct segments are not matching')
                 
-                lab_entry.onset = segment_onset_time + self.frames_to_seconds(ctm_entry.onset)
-                lab_entry.offset = lab_entry.onset + self.frames_to_seconds(ctm_entry.duration)
+                # lab_entry.onset = segment_onset_time + self.frames_to_seconds(ctm_entry.onset)
+                # lab_entry.offset = lab_entry.onset + self.frames_to_seconds(ctm_entry.duration)
+
+                lab_entry.onset = segment_onset_time + ctm_entry.onset
+                lab_entry.offset = lab_entry.onset + ctm_entry.duration
+
+
 
                 ref_island_onset+=1
                 hyp_island_onset+=1

@@ -170,7 +170,6 @@ class Transcriber():
         self.compute_cmvn_stats()
         self.generate_lattices(self.lat_path, feature_string)
         self.calculate_initial_fmllr(feature_string)
-
         feats_first_pass = feature_string+f" transform-feats --utt2spk=ark:{self.spk2utt} ark:{self.pre_trans_path} ark:- ark:- |"
         self.generate_lattices(self.tmp_lat, feats_first_pass, determinize="false")
         self.calculate_final_fmllr(feats_first_pass)
@@ -182,8 +181,8 @@ class Transcriber():
         words_ctm_sym = [
             ctmEntry(
                 word=self.int2sym_dictionary[ln[4]],
-                onset=ln[2],
-                duration=ln[3]
+                onset=float(ln[2]),
+                duration=float(ln[3])
             ) 
             for ln in out
             ]
