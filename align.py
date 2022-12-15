@@ -2,7 +2,7 @@ import os
 from aligner.transcriber import CreateHCLG, DecodeSegments
 from kaldialign import align
 from aligner.features import Mfcc
-from aligner.utils import arg_parser, read_reference_text, initialize_working_dir, read_yaml_file
+from aligner.utils import AlignmentLogger, arg_parser, read_reference_text, initialize_working_dir, read_yaml_file
 from aligner.config import create_transcriber_args, create_mfcc_args, create_hclg_args, create_fmllr_args
 from aligner.alignment import T2TAlignment
 from aligner.segmenter import Segmenter
@@ -17,7 +17,7 @@ model_dir_path = args.m
 working_dir_path = args.w
 vad_access_token = config['vad']['vad_access_token']
 vad_duration = config['vad']['duration']
-
+alignment_logger = AlignmentLogger(working_dir_path=working_dir_path, config=config)
 init_segment = os.path.join(
 working_dir_path,
 config['working_dir_paths']['segments']
@@ -48,9 +48,8 @@ hclg = CreateHCLG(hclg_args)
 mfcc = Mfcc(mfcc_args)
 
 
-# segmenter = Segmenter(access_token=vad_access_token, segment_duration=15)
-# segmenter.run(working_dir_path, audio_path)
-
+segmenter = Segmenter(access_token=vad_access_token, segment_duration=15)
+segmenter.run(working_dir_path, audio_path)
 mfcc.make_feats(segment_path=init_segment)
 hclg.mkgraph(lm_text, 'trigram')
 
@@ -59,6 +58,8 @@ hclg.mkgraph(lm_text, 'trigram')
 # transcriber = Transcriber(transcriber_args)
 transcriber = Transcriber(fmllr_args)
 hypothesis, hypothesis_ctm = transcriber.decode(working_dir_path)
+print(hypothesis)
+# exit(1)
 reference = read_reference_text(transcription_path)
 
 t2talignment = T2TAlignment()
@@ -79,7 +80,7 @@ with open('alignment.lab', 'w') as f:
 
 
 
-
+exit(1)
 
 
 segments_function = DecodeSegments(
@@ -95,8 +96,6 @@ segments_function = DecodeSegments(
 
 lattice_type = 'trigram'
 unaligned_regions_hypothesis = segments_function.decode_parallel(unaligned_regions, lattice_type)
-print(unaligned_regions_hypothesis)
-exit(1)
 for iter in range(3):
         for segment_data in unaligned_regions_hypothesis:
                 if segment_data==None: continue
@@ -110,13 +109,13 @@ for iter in range(3):
                 text_onset_index=segment_data.onset_index,
                 segment_onset_time=segment_data.onset_time
         )
-        if iter > 0:
+        if iter >= 1:
                 lattice_type = 'transducer'
 
         unaligned_regions_hypothesis = segments_function.decode_parallel(unaligned_regions, lattice_type)
 
 
-        with open(f'greek_text_iter{iter}.lab', 'w') as f:
+        with open(f'alignment{iter}.lab', 'w') as f:
                 for entry in current_alignment:
                         f.write(f'{entry.onset} {entry.offset} {entry.word}\n')
 

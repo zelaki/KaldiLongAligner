@@ -64,6 +64,31 @@ class Segmenter():
                 off=vad_segments[-1].offset_time
             ))
     
+    def create_utt2spk(
+        self,
+        data_dir
+        ) -> None:
+        segments_path = os.path.join(data_dir, 'segments')
+        utt2spk_path = os.path.join(data_dir, 'utt2spk')
+        spk2utt_path = os.path.join(data_dir, 'spk2utt')
+        with open(segments_path, 'r') as fd:
+            segment_names = [ln.split()[0] for ln in fd]
+        with open(utt2spk_path, 'w') as u2s, open(spk2utt_path, 'w') as s2u:
+            for segment_name in segment_names:
+                u2s.write(f"{segment_name} {segment_name}\n")
+                s2u.write(f"{segment_name} {segment_name}\n")
+
+    def sort_segments(
+        self,
+        data_dir
+    ) -> None:
+        segments_path = os.path.join(data_dir, 'segments')
+        with open(segments_path, 'r') as fd:
+            segments = [ln for ln in fd]
+        segments_kaldi_sorted = sorted(segments)
+        with open(segments_path, 'w') as fd:
+            for segment in segments_kaldi_sorted:
+                fd.write(segment)
 
     def run(
         self,
@@ -71,6 +96,7 @@ class Segmenter():
         audio_path: str
       ) -> None:
 
-      vad_segments = self.run_vad(audio_path)
-      self.create_segments_from_vad(data_dir_path, vad_segments)
-
+        vad_segments = self.run_vad(audio_path)
+        self.create_segments_from_vad(data_dir_path, vad_segments)
+        self.sort_segments(data_dir_path)
+        self.create_utt2spk(data_dir_path)

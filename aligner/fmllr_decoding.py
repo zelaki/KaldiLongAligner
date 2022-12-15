@@ -38,7 +38,7 @@ class Transcriber():
         self.tmp_lat = args.tmp_lat
         self.trans_path = args.trans_path
         self.final_lat_path = args.final_lat_path
-
+        self.log_file_path = args.log_file_path
         self.int2sym_dictionary = {}
         with open(self.words_path, 'r') as f:
             lines = [ln.rstrip().split() for ln in f.readlines()]  
@@ -49,15 +49,17 @@ class Transcriber():
     def compute_cmvn_stats(
         self,
     ) -> None:
-        subprocess.call(
-            [
-                thirdparty_binary("compute-cmvn-stats"),
-                f"--spk2utt=ark:{self.spk2utt}",
-                f"scp:{self.feats}",
-                f"ark,scp:{self.cmvn_ark},{self.cmvn_scp}",
-            ],
-            env=os.environ,
-        )
+        with open(self.log_file_path, 'a') as log:
+            subprocess.call(
+                [
+                    thirdparty_binary("compute-cmvn-stats"),
+                    f"--spk2utt=ark:{self.spk2utt}",
+                    f"scp:{self.feats}",
+                    f"ark,scp:{self.cmvn_ark},{self.cmvn_scp}",
+                ],
+                env=os.environ,
+                stderr=log
+            )
 
 
 
@@ -68,26 +70,29 @@ class Transcriber():
         feature_string,
         determinize="true"
         ) -> None:
-        decode_proc = subprocess.Popen(
-            [
-                thirdparty_binary("gmm-latgen-faster"),
-                f"--max-active={self.max_active}",
-                f"--beam={self.beam}",
-                f"--lattice-beam={self.lattice_beam}",
-                "--allow-partial=true",
-                f"--determinize-lattice={determinize}",
-                f"--word-symbol-table={self.words_path}",
-                f"--acoustic-scale={self.acoustic_scale}",
-                self.final_model,
-                self.hclg_path,
-                feature_string,
-                f"ark:{lat_path}",
-            ],
-            # stderr=subprocess.PIPE,
-            env=os.environ,
-            encoding="utf8",
-        )
-        decode_proc.communicate()
+        with open(self.log_file_path, 'a') as log:
+
+            decode_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("gmm-latgen-faster"),
+                    f"--max-active={self.max_active}",
+                    f"--beam={self.beam}",
+                    f"--lattice-beam={self.lattice_beam}",
+                    "--allow-partial=true",
+                    f"--determinize-lattice={determinize}",
+                    f"--word-symbol-table={self.words_path}",
+                    f"--acoustic-scale={self.acoustic_scale}",
+                    self.final_model,
+                    self.hclg_path,
+                    feature_string,
+                    f"ark:{lat_path}",
+                ],
+                env=os.environ,
+                encoding="utf8",
+                stderr=log
+
+            )
+            decode_proc.communicate()
 
 
 
@@ -96,64 +101,271 @@ class Transcriber():
         self,
         lat_path
     ):
+        with open(self.log_file_path, 'a') as log:
 
-        scale_proc =  subprocess.Popen(
-            [
-                thirdparty_binary("lattice-add-penalty"),
-                f"--word-ins-penalty={self.word_insertion_penalty}",
-                f'ark:{lat_path}',
-                "ark:-"
+            scale_proc =  subprocess.Popen(
+                [
+                    thirdparty_binary("lattice-add-penalty"),
+                    f"--word-ins-penalty={self.word_insertion_penalty}",
+                    f'ark:{lat_path}',
+                    "ark:-"
 
-            ],
-            stdout=subprocess.PIPE,
-            env=os.environ,
-            encoding="utf8"
-        )
-        
-        one_best_proc = subprocess.Popen(
-            [
-                thirdparty_binary("lattice-1best"),
-                f"--acoustic-scale={self.acoustic_scale}",
-                "ark:-",
-                "ark:-"
-            ],
-            stdin=scale_proc.stdout,
-            stdout=subprocess.PIPE,
-            env=os.environ,
-            encoding="utf8"
-        )
+                ],
 
-        align_words_proc = subprocess.Popen(
-            [
-                thirdparty_binary("lattice-align-words"),
-                self.word_boundary_int,
-                self.final_model,
-                "ark:-",
-                "ark:-"
-            ],
-            stdin=one_best_proc.stdout,
-            stdout=subprocess.PIPE,
-            env=os.environ,
-            encoding="utf8"
-        )
-        
-        nbest_to_ctm_proc = subprocess.Popen(
-            [
-                thirdparty_binary("nbest-to-ctm"),
-                f"--frame-shift={self.frame_shift}",
-                "ark:-",
-                "-"
-            ],
-            stdin=align_words_proc.stdout,
-            stdout=subprocess.PIPE,
-            env=os.environ,
-            encoding="utf8"
-        )
-        out, err = nbest_to_ctm_proc.communicate()
-        out = [ln.split() for ln in out.split('\n') if ln != '']
+                stdout=subprocess.PIPE,
+                env=os.environ,
+                encoding="utf8",
+                stderr=log
+            )
+            
+            one_best_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("lattice-1best"),
+                    f"--acoustic-scale={self.acoustic_scale}",
+                    "ark:-",
+                    "ark:-"
+                ],
+                stdin=scale_proc.stdout,
+                stdout=subprocess.PIPE,
+                env=os.environ,
+                encoding="utf8",
+                stderr=log
+            )
 
+            align_words_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("lattice-align-words"),
+                    self.word_boundary_int,
+                    self.final_model,
+                    "ark:-",
+                    "ark:-"
+                ],
+                stdin=one_best_proc.stdout,
+                stdout=subprocess.PIPE,
+                env=os.environ,
+                encoding="utf8",
+                stderr=log
+            )
+            
+            nbest_to_ctm_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("nbest-to-ctm"),
+                    f"--frame-shift={self.frame_shift}",
+                    "ark:-",
+                    "-"
+                ],
+                stdin=align_words_proc.stdout,
+                stdout=subprocess.PIPE,
+                env=os.environ,
+                encoding="utf8",
+                stderr=log
+            )
+            out, err = nbest_to_ctm_proc.communicate()
+            out = [ln.split() for ln in out.split('\n') if ln != '']
+            with open("segments.ctm", 'w') as fd:
+                for ln in out:
+                    ln = ' '.join(ln)
+                    fd.write(f'{ln}\n')
+            out = sorted(out, key=lambda x:float(x[0].split('_')[1]))
         return out
 
+
+
+
+    def calculate_final_fmllr(
+        self,
+        feature_string
+    ) -> None:
+    
+        with open(self.log_file_path, 'a') as log:
+
+            determinize_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("lattice-determinize-pruned"),
+                    f"--acoustic-scale={self.acoustic_scale}",
+                    "--beam=4.0",
+                    f"ark:{self.tmp_lat}",
+                    "ark:-",
+                ],
+                stdout=subprocess.PIPE,
+                env=os.environ,
+                stderr=log
+
+            )
+
+            latt_post_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("lattice-to-post"),
+                    f"--acoustic-scale={self.acoustic_scale}",
+                    "ark:-",
+                    "ark:-",
+                ],
+                stdin=determinize_proc.stdout,
+                stdout=subprocess.PIPE,
+                env=os.environ,
+                stderr=log
+
+            )
+            weight_silence_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("weight-silence-post"),
+                    f"{self.silence_weight}",
+                    self.sil_phones,
+                    self.final_model,
+                    "ark:-",
+                    "ark:-",
+                ],
+                stdin=latt_post_proc.stdout,
+                stdout=subprocess.PIPE,
+                env=os.environ,
+                stderr=log
+            )
+            fmllr_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("gmm-est-fmllr"),
+                    f"--fmllr-update-type={self.fmllr_update_type}",
+                    f"--spk2utt=ark:{self.spk2utt}",
+                    self.final_model,
+                    feature_string,
+                    "ark,s,cs:-",
+                    f"ark:{self.temp_trans_path}",
+                ],
+                stdin=weight_silence_proc.stdout,
+                stderr=log,
+                env=os.environ,
+                encoding="utf8",
+            )
+            fmllr_proc.communicate()
+
+            compose_transforms_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("compose-transforms"),
+                    "--b-is-affine=true",
+                    f"ark:{self.temp_trans_path}",
+                    f"ark:{self.pre_trans_path}",
+                    f"ark:{self.trans_path}"
+                ],
+                stderr=log,
+                env=os.environ,
+                encoding='utf8'
+            )
+            compose_transforms_proc.communicate()
+
+
+    def calculate_initial_fmllr(
+        self,
+        feature_string
+    ) -> None:
+
+
+        with open(self.log_file_path, 'a') as log:
+
+            latt_post_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("lattice-to-post"),
+                    f"--acoustic-scale={self.acoustic_scale}",
+                    f"ark:{self.lat_path}",
+                    "ark:-",
+                ],
+                stdout=subprocess.PIPE,
+                env=os.environ,
+                stderr=log
+            )
+            weight_silence_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("weight-silence-post"),
+                    f"{self.silence_weight}",
+                    self.sil_phones,
+                    self.final_model,
+                    "ark,s,cs:-",
+                    "ark:-",
+                ],
+                stdin=latt_post_proc.stdout,
+                stdout=subprocess.PIPE,
+                env=os.environ,
+                stderr=log,
+            )
+            gmm_gpost_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("gmm-post-to-gpost"),
+                    self.final_model,
+                    feature_string,
+                    "ark,s,cs:-",
+                    "ark:-",
+                ],
+                stdin=weight_silence_proc.stdout,
+                stdout=subprocess.PIPE,
+                env=os.environ,
+                stderr=log,
+            )
+            fmllr_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("gmm-est-fmllr-gpost"),
+                    f"--fmllr-update-type={self.fmllr_update_type}",
+                    f"--spk2utt=ark:{self.spk2utt}",
+                    self.final_model,
+                    feature_string,
+                    "ark,s,cs:-",
+                    f"ark:{self.pre_trans_path}",
+                ],
+                stdin=gmm_gpost_proc.stdout,
+                stdout=subprocess.PIPE,
+                stderr=log,
+                env=os.environ,
+                encoding="utf8",
+            )
+            fmllr_proc.communicate()
+
+    def rescore_fmllr(
+        self,
+        feature_string
+    ) -> None:
+
+
+        with open(self.log_file_path, 'a') as log:
+
+            rescore_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("gmm-rescore-lattice"),
+                    self.final_model,
+                    f"ark:{self.tmp_lat}",
+                    feature_string,
+                    "ark:-",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=log,
+                env=os.environ,
+            )
+            determinize_proc = subprocess.Popen(
+                [
+                    thirdparty_binary("lattice-determinize-pruned"),
+                    f"--acoustic-scale={self.acoustic_scale}",
+                    f"--beam={self.lattice_beam}",
+                    "ark:-",
+                    f"ark:{self.final_lat_path}",
+                ],
+                stdin=rescore_proc.stdout,
+                stderr=log,
+                encoding="utf8",
+                env=os.environ,
+            )
+            determinize_proc.communicate
+            determinize_proc.wait()
+
+    def fix_ctm_timings(\
+        self,
+        hypothesis_ctm
+        ) -> List[ctmEntry]:
+
+        hypothesis_ctm_fixed = []
+        for segment_name, _, onset_time, duration, word in hypothesis_ctm:
+            segment_onset_time = float(segment_name.split('_')[1])
+            hypothesis_ctm_fixed.append(ctmEntry(
+                word=self.int2sym_dictionary[word],
+                onset=float(onset_time) + segment_onset_time,
+                duration=float(duration)
+            ))
+        return hypothesis_ctm_fixed
 
     def decode(
         self,
@@ -175,179 +387,21 @@ class Transcriber():
         self.calculate_final_fmllr(feats_first_pass)
         feats_final_pass = feature_string+f" transform-feats --utt2spk=ark:{self.spk2utt} ark:{self.trans_path} ark:- ark:- |"
         self.rescore_fmllr(feats_final_pass)
+
         out = self.lattice_to_ctm(self.final_lat_path)
+        print(out)
         words_int = [ln[4] for ln in out]
         words_sym = [self.int2sym_dictionary[word] for word in words_int]
-        words_ctm_sym = [
-            ctmEntry(
-                word=self.int2sym_dictionary[ln[4]],
-                onset=float(ln[2]),
-                duration=float(ln[3])
-            ) 
-            for ln in out
-            ]
+        words_ctm_sym = self.fix_ctm_timings(out)
+        # words_ctm_sym = [
+        #     ctmEntry(
+        #         word=self.int2sym_dictionary[ln[4]],
+        #         onset=float(ln[2]),
+        #         duration=float(ln[3])
+        #     ) 
+        #     for ln in out
+        #     ]
         return words_sym, words_ctm_sym
-
-    def calculate_final_fmllr(
-        self,
-        feature_string
-    ) -> None:
-        determinize_proc = subprocess.Popen(
-            [
-                thirdparty_binary("lattice-determinize-pruned"),
-                f"--acoustic-scale={self.acoustic_scale}",
-                "--beam=4.0",
-                f"ark:{self.tmp_lat}",
-                "ark:-",
-            ],
-            stdout=subprocess.PIPE,
-            env=os.environ,
-        )
-
-        latt_post_proc = subprocess.Popen(
-            [
-                thirdparty_binary("lattice-to-post"),
-                f"--acoustic-scale={self.acoustic_scale}",
-                "ark:-",
-                "ark:-",
-            ],
-            stdin=determinize_proc.stdout,
-            stdout=subprocess.PIPE,
-            env=os.environ,
-        )
-        weight_silence_proc = subprocess.Popen(
-            [
-                thirdparty_binary("weight-silence-post"),
-                f"{self.silence_weight}",
-                self.sil_phones,
-                self.final_model,
-                "ark:-",
-                "ark:-",
-            ],
-            stdin=latt_post_proc.stdout,
-            stdout=subprocess.PIPE,
-            env=os.environ,
-        )
-        fmllr_proc = subprocess.Popen(
-            [
-                thirdparty_binary("gmm-est-fmllr"),
-                f"--fmllr-update-type={self.fmllr_update_type}",
-                f"--spk2utt=ark:{self.spk2utt}",
-                self.final_model,
-                feature_string,
-                "ark,s,cs:-",
-                f"ark:{self.temp_trans_path}",
-            ],
-            stdin=weight_silence_proc.stdout,
-            stderr=subprocess.PIPE,
-            env=os.environ,
-            encoding="utf8",
-        )
-        fmllr_proc.communicate()
-
-        compose_transforms_proc = subprocess.Popen(
-            [
-                thirdparty_binary("compose-transforms"),
-                "--b-is-affine=true",
-                f"ark:{self.temp_trans_path}",
-                f"ark:{self.pre_trans_path}",
-                f"ark:{self.trans_path}"
-            ]
-        )
-        compose_transforms_proc.communicate()
-
-
-    def calculate_initial_fmllr(
-        self,
-        feature_string
-    ) -> None:
-
-        latt_post_proc = subprocess.Popen(
-            [
-                thirdparty_binary("lattice-to-post"),
-                f"--acoustic-scale={self.acoustic_scale}",
-                f"ark:{self.lat_path}",
-                "ark:-",
-            ],
-            stdout=subprocess.PIPE,
-            env=os.environ,
-        )
-        weight_silence_proc = subprocess.Popen(
-            [
-                thirdparty_binary("weight-silence-post"),
-                f"{self.silence_weight}",
-                self.sil_phones,
-                self.final_model,
-                "ark,s,cs:-",
-                "ark:-",
-            ],
-            stdin=latt_post_proc.stdout,
-            stdout=subprocess.PIPE,
-            env=os.environ,
-        )
-        gmm_gpost_proc = subprocess.Popen(
-            [
-                thirdparty_binary("gmm-post-to-gpost"),
-                self.final_model,
-                feature_string,
-                "ark,s,cs:-",
-                "ark:-",
-            ],
-            stdin=weight_silence_proc.stdout,
-            stdout=subprocess.PIPE,
-            env=os.environ,
-        )
-        fmllr_proc = subprocess.Popen(
-            [
-                thirdparty_binary("gmm-est-fmllr-gpost"),
-                f"--fmllr-update-type={self.fmllr_update_type}",
-                f"--spk2utt=ark:{self.spk2utt}",
-                self.final_model,
-                feature_string,
-                "ark,s,cs:-",
-                f"ark:{self.pre_trans_path}",
-            ],
-            stdin=gmm_gpost_proc.stdout,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=os.environ,
-            encoding="utf8",
-        )
-        fmllr_proc.communicate()
-
-    def rescore_fmllr(
-        self,
-        feature_string
-    ) -> None:
-        rescore_proc = subprocess.Popen(
-            [
-                thirdparty_binary("gmm-rescore-lattice"),
-                self.final_model,
-                f"ark:{self.tmp_lat}",
-                feature_string,
-                "ark:-",
-            ],
-            stdout=subprocess.PIPE,
-            env=os.environ,
-        )
-        determinize_proc = subprocess.Popen(
-            [
-                thirdparty_binary("lattice-determinize-pruned"),
-                f"--acoustic-scale={self.acoustic_scale}",
-                f"--beam={self.lattice_beam}",
-                "ark:-",
-                f"ark:{self.final_lat_path}",
-            ],
-            stdin=rescore_proc.stdout,
-            stderr=subprocess.PIPE,
-            encoding="utf8",
-            env=os.environ,
-        )
-        determinize_proc.communicate
-        determinize_proc.wait()
-
-
-
 
 
 if __name__ == '__main__':

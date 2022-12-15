@@ -40,18 +40,14 @@ class CreateHCLG():
     def __init__(
     self,
     args: HCLGArgs
-    # disambig_L_path: str,
-    # disambig_int_path: str,
-    # words_path: str,
-    # working_directory: str,
-    # final_model_path: str,
+
 ):
         self.model_dir_path = args.model_dir_path
         self.tree_path = os.path.join(self.model_dir_path, 'tree')
         self.disambig_L_path = args.disambig_L_path
         self.disambig_int_path = args.disambig_int_path
         self.working_directory = args.working_directory
-        self.log_file_path = os.path.join(args.working_directory, 'log.txt')
+        self.log_file_path = args.log_file_path
         self.final_model_path = args.final_model_path
         self.graph_directory = os.path.join(args.working_directory, 'graph_dir')
         self.lm_directory = os.path.join(args.working_directory, 'lm_dir')
@@ -99,9 +95,10 @@ class CreateHCLG():
                 #     env=os.environ,
 
                 # )
-                print(f'{thirdparty_binary("fstcompile")} --isymbols={self.words_path} --osymbols={self.words_path} {self.g_text_path} | fstdeterminizestar | fstminimize> {self.g_path}')
-                subprocess.call(f'{thirdparty_binary("fstcompile")} --isymbols={self.words_path} --osymbols={self.words_path} {self.g_text_path} | fstdeterminizestar | fstminimize> {self.g_path}', shell=True)
-                # minimize_proc.communicate()
+                # determinize_proc.communicate()
+
+                # print(f'{thirdparty_binary("fstcompile")} --isymbols={self.words_path} --osymbols={self.words_path} {self.g_text_path} | fstdeterminizestar | fstminimize> {self.g_path}')
+                subprocess.call(f'{thirdparty_binary("fstcompile")} --isymbols={self.words_path} --osymbols={self.words_path} {self.g_text_path} | fstdeterminizestar | fstminimize> {self.g_path}', stderr=log_file, shell=True)
             
 
     def make_trigram(self, lmtext_path: str):
@@ -125,8 +122,6 @@ class CreateHCLG():
                 stderr=log_file,
                 env=os.environ,
             )
-            print(thirdparty_binary("arpa2fst"), "--disambig-symbol=#0",
-                f"--read-symbol-table={self.words_path}", "-", self.g_path)
             to_fst_proc.communicate()
             # with open(self.g_path, 'w') as g:
             #     determinize_proc = subprocess.Popen(
@@ -154,7 +149,7 @@ class CreateHCLG():
         with open(self.log_file_path, 'a') as log_file:
 
 
-            log_file.write("Generating LG.fst...")
+            log_file.write("Generating LG.fst...\n")
             compose_lg(self.disambig_L_path, self.g_path, self.lg_path, log_file)
 
             context_width = get_tree_info(self.tree_path, log_file, 'context-width')
@@ -169,7 +164,7 @@ class CreateHCLG():
             )                
 
 
-            log_file.write("Generating CLG.fst...")
+            log_file.write("Generating CLG.fst...\n")
             compose_clg(
                 self.disambig_int_path,
                 out_disambig,
@@ -304,17 +299,17 @@ class CreateHCLG():
 #     #     """
 #     #     return [(key, t['text']) for key, t in self.decode(feats_ark)]
 
-#     def fix_ctm_timing(self, hypothesis_ctm):
+    # def fix_ctm_timing(self, hypothesis_ctm):
 
-#         hypothesis_ctm_fixed = []
-#         for key, segment_ctm in hypothesis_ctm:
-#             segment_onset_time = round(float(key.split("_")[1]) * 100)
-#             hypothesis_ctm_fixed+=[ctmEntry( 
-#                 word=entry.word,
-#                 onset=entry.onset + segment_onset_time,
-#                 duration=entry.duration
-#                 ) for entry in segment_ctm]
-#         return hypothesis_ctm_fixed
+    #     hypothesis_ctm_fixed = []
+    #     for key, segment_ctm in hypothesis_ctm:
+    #         segment_onset_time = round(float(key.split("_")[1]) * 100)
+    #         hypothesis_ctm_fixed+=[ctmEntry( 
+    #             word=entry.word,
+    #             onset=entry.onset + segment_onset_time,
+    #             duration=entry.duration
+    #             ) for entry in segment_ctm]
+    #     return hypothesis_ctm_fixed
 
 #     def decode_ctm(self, feats_ark):
 #         """
@@ -406,7 +401,7 @@ class DecodeSegments():
         text = ' '.join(text)
         with open(text_path, 'w') as f:
             f.write(text)
-        return text
+        return text, text_path
 
     def create_segnemt_lm_text(
         self,
@@ -441,7 +436,7 @@ class DecodeSegments():
         segments_path = self.create_segments_file(
             segment_data_dir_path=segment_data_dir_path,
             unaligned_region=unaligned_region)
-        text = self.create_segment_text(
+        text, text_path = self.create_segment_text(
             segment_data_dir_path=segment_data_dir_path,
             unaligned_region=unaligned_region
         )
@@ -459,7 +454,11 @@ class DecodeSegments():
             self.model_dir,
             segment_data_dir_path)
         hclg = CreateHCLG(hclg_args)
-        hclg.mkgraph(lm_text_path, lattice_type)
+
+        if lattice_type=='transducer':
+            hclg.mkgraph(text_path, lattice_type)
+        else:
+            hclg.mkgraph(lm_text_path, lattice_type)
 
 
         self.feature_extractor.make_feats(

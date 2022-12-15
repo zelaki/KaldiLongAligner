@@ -14,6 +14,7 @@ class HCLGArgs():
     final_model_path: str 
     words_path: str
     model_dir_path: str
+    log_file_path:str
 
 @dataclass
 class TranscriberArgs():
@@ -54,6 +55,7 @@ class FmllrDecodingArgs():
     temp_trans_path: str
     trans_path: str
     final_lat_path: str
+    log_file_path: str
 
 
 def create_fmllr_args(
@@ -93,7 +95,8 @@ def create_fmllr_args(
         tmp_lat = os.path.join(working_dir,'tmp_lat.1'),
         temp_trans_path= os.path.join(working_dir, 'trans_tmp'),
         trans_path = os.path.join(working_dir,"trans.1"),
-        final_lat_path = os.path.join(working_dir,"fmllr_lat.1")
+        final_lat_path = os.path.join(working_dir,"fmllr_lat.1"),
+        log_file_path= os.path.join(working_dir, 'decoding.log')
     )
     return args
 
@@ -157,7 +160,8 @@ def create_hclg_args(model_dir_path: str, working_dir_path: str) -> HCLGArgs:
         working_directory=working_dir_path,
         final_model_path=os.path.join(model_dir_path,'final.mdl'),
         words_path=os.path.join(model_dir_path, 'words.txt'),
-        model_dir_path = model_dir_path
+        model_dir_path = model_dir_path,
+        log_file_path=os.path.join(working_dir_path, 'graph.log')
     )
     return args
 

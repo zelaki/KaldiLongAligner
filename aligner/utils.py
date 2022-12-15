@@ -2,9 +2,12 @@ import shutil
 import os
 import yaml
 import argparse
+import sys
 from dataclasses import dataclass
 from typing import List, Dict, Any
 from yaml.loader import SafeLoader
+from loguru import logger
+
 
 
 MetaDict = Dict[str, Any]
@@ -163,3 +166,49 @@ def arg_parser():
 
     return parser
 
+
+
+class AlignmentLogger():
+
+    def __init__(
+        self,
+        working_dir_path,
+        config
+    ) -> None:
+        logger.remove()
+        logger.add(sys.stderr, level="INFO")
+        logger.add(config['working_dir_paths']['log_file'])
+        self.working_dir_path = working_dir_path
+        self.segments_data_dir = os.path.join(
+            self.working_dir_path,
+            config['working_dir_paths']['segments_data'])
+
+
+    def dump_log_to_main(
+        self,
+        log_path,
+        header=''
+        ) -> None:
+        
+        if header != '':
+            logger.debug(header)
+        with open(log_path, 'r') as log:
+            for ln in log:
+                logger.debug(ln)
+
+
+
+    def append_decoding_logs(
+        self,
+    ) -> None:
+
+        for segment_data_dir_path in os.listdir(self.segments_data_dir):
+            decoding_log_path = os.path.join(
+                self.segments_data_dir,
+                segment_data_dir_path,
+                self.config['working_dir_paths']['decoding.log']
+                )
+            header = f'Decoding Log for segment {segment_data_dir_path}'
+            self.dump_log(decoding_log_path, header=header)  
+
+            

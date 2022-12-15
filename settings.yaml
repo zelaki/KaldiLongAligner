@@ -4,6 +4,8 @@ working_dir_paths:
   feats_ark: 'feats.ark'
   segments_data: 'segments_data'
   lm_text: 'lm.txt'
+  log_file: 'aligment.log'
+  decoding_log_file: 'decoding.log'
 
 vad:
   vad_access_token: "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"
